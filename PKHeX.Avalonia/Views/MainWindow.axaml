@@ -1,0 +1,309 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PKHeX.Avalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+        x:Class="PKHeX.Avalonia.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="PKHeX.Avalonia"
+        WindowStartupLocation="CenterScreen"
+        Width="920" Height="820">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <DockPanel>
+        <!-- Top bar -->
+        <Border DockPanel.Dock="Top" Padding="8" Background="#22808080">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Name="OpenButton" Content="📂 Apri save…" Click="OnOpenClicked" />
+                <Button Content="💾 Salva" Command="{Binding SaveCommand}" />
+                <TextBlock Text="{Binding SaveInfo}" VerticalAlignment="Center" Opacity="0.8" />
+            </StackPanel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#22808080">
+            <TextBlock Text="{Binding StatusText}" />
+        </Border>
+
+        <!-- Body: tabs -->
+        <TabControl>
+        <TabItem Header="Pokémon">
+        <Grid ColumnDefinitions="150,*,Auto">
+            <ListBox Grid.Column="0"
+                     ItemsSource="{Binding BoxNames}"
+                     SelectedIndex="{Binding SelectedBoxIndex}" />
+
+            <ScrollViewer Grid.Column="1">
+                <ListBox ItemsSource="{Binding CurrentBox}"
+                         SelectedItem="{Binding SelectedSlot}"
+                         Background="Transparent" Margin="8">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="2" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SlotViewModel">
+                            <Border Width="150" Height="66" Padding="4"
+                                    CornerRadius="6"
+                                    BorderBrush="#40808080" BorderThickness="1"
+                                    Background="#18808080">
+                                <Grid ColumnDefinitions="64,*">
+                                    <Image Grid.Column="0" Source="{Binding Sprite}"
+                                           Width="64" Height="56"
+                                           Stretch="Uniform"
+                                           VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DisplayLine}" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding SubLine}" Opacity="0.7" FontSize="12" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </ScrollViewer>
+
+            <!-- Editor panel -->
+            <Border Grid.Column="2" Width="330" Padding="12"
+                    Background="#22808080"
+                    IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <ScrollViewer>
+                    <StackPanel DataContext="{Binding Editor}" Spacing="6"
+                                x:DataType="vm:PokemonEditorViewModel">
+                        <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
+
+                        <TextBlock Text="Specie" Margin="0,6,0,0" Opacity="0.7" />
+                        <ComboBox ItemsSource="{Binding SpeciesNames}"
+                                  SelectedIndex="{Binding Species}" HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Livello" Margin="0,6,0,0" Opacity="0.7" />
+                        <NumericUpDown Value="{Binding Level}" Minimum="1" Maximum="100"
+                                       Increment="1" FormatString="0" />
+
+                        <TextBlock Text="Natura" Margin="0,6,0,0" Opacity="0.7" />
+                        <ComboBox ItemsSource="{Binding NatureNames}"
+                                  SelectedIndex="{Binding NatureIndex}" HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Mosse" Margin="0,6,0,0" Opacity="0.7" />
+                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move1}" HorizontalAlignment="Stretch" />
+                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move2}" HorizontalAlignment="Stretch" />
+                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move3}" HorizontalAlignment="Stretch" />
+                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move4}" HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Statistiche" Margin="0,6,0,0" Opacity="0.7" />
+                        <Grid ColumnDefinitions="Auto,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                              ColumnSpacing="6" RowSpacing="3">
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="IV (0–31)"  FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="EV (0–255)" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="HP"  VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding IvHp}"  Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding EvHp}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Atk" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding IvAtk}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="2" Grid.Column="2" Value="{Binding EvAtk}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Def" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding IvDef}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="3" Grid.Column="2" Value="{Binding EvDef}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="SpA" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding IvSpa}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="4" Grid.Column="2" Value="{Binding EvSpa}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="SpD" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding IvSpd}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="5" Grid.Column="2" Value="{Binding EvSpd}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Spe" VerticalAlignment="Center" />
+                            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding IvSpe}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
+                            <NumericUpDown Grid.Row="6" Grid.Column="2" Value="{Binding EvSpe}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                        </Grid>
+
+                        <!-- Condizione (contest) -->
+                        <StackPanel IsVisible="{Binding HasContest}" Spacing="3">
+                            <TextBlock Text="Condizione (0–255)" Margin="0,8,0,0" Opacity="0.7" />
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="3">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Cool"     VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ConCool}"   Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Bellezza" VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="0" Grid.Column="3" Value="{Binding ConBeauty}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Grazia"   VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ConCute}"   Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Acume"    VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding ConSmart}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Grinta"   VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ConTough}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Fascino"  VerticalAlignment="Center" />
+                                <NumericUpDown Grid.Row="2" Grid.Column="3" Value="{Binding ConSheen}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Fiocchi (ribbons) -->
+                        <TextBlock Text="Fiocchi" Margin="0,8,0,0" Opacity="0.7" />
+                        <ItemsControl ItemsSource="{Binding Ribbons}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RibbonEntryViewModel">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                        <CheckBox Grid.Column="0" Content="{Binding Label}"
+                                                  IsChecked="{Binding IsSet}"
+                                                  IsVisible="{Binding IsBoolean}" />
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                   VerticalAlignment="Center"
+                                                   IsVisible="{Binding !IsBoolean}" />
+                                        <NumericUpDown Grid.Column="1" Value="{Binding Count}"
+                                                       Minimum="0" Maximum="{Binding MaxCount}" FormatString="0"
+                                                       MinWidth="0" Width="110"
+                                                       IsVisible="{Binding !IsBoolean}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Content="✔ Applica" Command="{Binding ApplyCommand}"
+                                HorizontalAlignment="Stretch" Margin="0,10,0,0" />
+
+                        <Border Height="1" Background="#40808080" Margin="0,10" />
+
+                        <TextBlock Text="Set Showdown" FontWeight="SemiBold" />
+                        <TextBox Text="{Binding ShowdownText}"
+                                 AcceptsReturn="True" TextWrapping="Wrap"
+                                 Height="120" FontFamily="monospace"
+                                 PlaceholderText="Incolla qui un set Showdown e premi Importa…" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                            <Button Grid.Column="0" Content="⬇ Importa"
+                                    Command="{Binding ImportShowdownCommand}"
+                                    HorizontalAlignment="Stretch" />
+                            <Button Grid.Column="1" Content="⬆ Esporta"
+                                    Command="{Binding ExportShowdownCommand}"
+                                    HorizontalAlignment="Stretch" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        </TabItem>
+
+        <!-- ALLENATORE -->
+        <TabItem Header="Allenatore">
+            <ScrollViewer>
+                <StackPanel DataContext="{Binding Trainer}" x:DataType="vm:TrainerViewModel"
+                            Spacing="6" Margin="16" MaxWidth="420" HorizontalAlignment="Left">
+                    <TextBlock Text="Nome allenatore (OT)" Opacity="0.7" />
+                    <TextBox Text="{Binding OT}" MaxLength="7" />
+                    <TextBlock Text="Genere" Opacity="0.7" Margin="0,6,0,0" />
+                    <ComboBox ItemsSource="{Binding GenderOptions}" SelectedIndex="{Binding Gender}" HorizontalAlignment="Stretch" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="TID" Opacity="0.7" Margin="0,6,0,0" />
+                            <NumericUpDown Value="{Binding TID}" Minimum="0" Maximum="65535" FormatString="0" MinWidth="0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="SID" Opacity="0.7" Margin="0,6,0,0" />
+                            <NumericUpDown Value="{Binding SID}" Minimum="0" Maximum="65535" FormatString="0" MinWidth="0" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Soldi" Opacity="0.7" Margin="0,6,0,0" />
+                    <NumericUpDown Value="{Binding Money}" Minimum="0" Maximum="999999" FormatString="0" MinWidth="0" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Ore giocate" Opacity="0.7" Margin="0,6,0,0" />
+                            <NumericUpDown Value="{Binding Hours}" Minimum="0" Maximum="999" FormatString="0" MinWidth="0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Minuti" Opacity="0.7" Margin="0,6,0,0" />
+                            <NumericUpDown Value="{Binding Minutes}" Minimum="0" Maximum="59" FormatString="0" MinWidth="0" />
+                        </StackPanel>
+                    </Grid>
+                    <Button Content="✔ Applica" Command="{Binding ApplyCommand}" HorizontalAlignment="Stretch" Margin="0,12,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ZAINO -->
+        <TabItem Header="Zaino">
+            <DockPanel DataContext="{Binding Bag}" x:DataType="vm:BagViewModel">
+                <Button DockPanel.Dock="Bottom" Content="✔ Applica zaino"
+                        Command="{Binding ApplyCommand}" HorizontalAlignment="Left" Margin="12,6" />
+                <TabControl ItemsSource="{Binding Pouches}">
+                    <TabControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PouchViewModel">
+                            <TextBlock Text="{Binding Name}" />
+                        </DataTemplate>
+                    </TabControl.ItemTemplate>
+                    <TabControl.ContentTemplate>
+                        <DataTemplate x:DataType="vm:PouchViewModel">
+                            <ScrollViewer>
+                                <ItemsControl ItemsSource="{Binding Items}" Margin="8">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ItemSlotViewModel">
+                                            <Grid ColumnDefinitions="*,110" ColumnSpacing="6" Margin="0,2">
+                                                <ComboBox Grid.Column="0"
+                                                          ItemsSource="{Binding $parent[ItemsControl].((vm:PouchViewModel)DataContext).ItemNames}"
+                                                          SelectedIndex="{Binding ItemId}"
+                                                          HorizontalAlignment="Stretch" />
+                                                <NumericUpDown Grid.Column="1" Value="{Binding Count}"
+                                                               Minimum="0" Maximum="{Binding MaxCount}"
+                                                               FormatString="0" MinWidth="0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DataTemplate>
+                    </TabControl.ContentTemplate>
+                </TabControl>
+            </DockPanel>
+        </TabItem>
+
+        <!-- POKEDEX / EVENTI -->
+        <TabItem Header="Pokédex / Eventi">
+            <ScrollViewer>
+                <StackPanel DataContext="{Binding Dex}" x:DataType="vm:DexViewModel"
+                            Spacing="6" Margin="16" MaxWidth="460" HorizontalAlignment="Left">
+                    <TextBlock Text="Pokédex" FontWeight="Bold" FontSize="16" />
+                    <TextBlock>
+                        <Run Text="Visti: " /><Run Text="{Binding SeenCount}" />
+                        <Run Text="   ·   Catturati: " /><Run Text="{Binding CaughtCount}" />
+                        <Run Text=" / " /><Run Text="{Binding MaxSpecies}" />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Segna tutti VISTI" Command="{Binding SetAllSeenCommand}" />
+                        <Button Content="Segna tutti CATTURATI" Command="{Binding SetAllCaughtCommand}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="#40808080" Margin="0,12" IsVisible="{Binding HasEventFlags}" />
+
+                    <StackPanel Spacing="6" IsVisible="{Binding HasEventFlags}">
+                        <TextBlock Text="Event flags (avanzato)" FontWeight="Bold" FontSize="16" />
+                        <TextBlock>
+                            <Run Text="Totale flag: " /><Run Text="{Binding EventFlagCount}" />
+                        </TextBlock>
+                        <TextBlock Text="Numero flag" Opacity="0.7" Margin="0,6,0,0" />
+                        <NumericUpDown Value="{Binding FlagNumber}" Minimum="0" Maximum="9999" FormatString="0" MinWidth="0" />
+                        <CheckBox Content="Attivo" IsChecked="{Binding FlagValue}" />
+                        <Button Content="✔ Applica flag" Command="{Binding ApplyFlagCommand}" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        </TabControl>
+    </DockPanel>
+
+</Window>
