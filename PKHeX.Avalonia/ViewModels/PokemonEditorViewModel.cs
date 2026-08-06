@@ -53,6 +53,13 @@ public partial class PokemonEditorViewModel : ViewModelBase
 
     [ObservableProperty] public partial bool IsShiny { get; set; }
 
+    // Nickname.
+    [ObservableProperty] public partial string NicknameText { get; set; } = "";
+
+    // Markings (● ▲ ■ ♥ …) — each can be toggled on/off.
+    public bool HasMarkings { get; }
+    public ObservableCollection<MarkingViewModel> Markings { get; } = new();
+
     // Form selection (Unown, Castform, Deoxys, …). Only shown when >1 form exists.
     public bool HasForms { get; }
     public IReadOnlyList<string> FormNames { get; } = [];
@@ -122,6 +129,15 @@ public partial class PokemonEditorViewModel : ViewModelBase
         EvSpa = pk.EV_SPA; EvSpd = pk.EV_SPD; EvSpe = pk.EV_SPE;
         IsShiny = pk.IsShiny;
 
+        NicknameText = pk.Nickname;
+        if (pk is IAppliedMarkings<bool> marks)
+        {
+            HasMarkings = true;
+            string[] glyphs = ["●", "▲", "■", "♥", "★", "◆"];
+            for (int i = 0; i < marks.MarkingCount; i++)
+                Markings.Add(new MarkingViewModel(i, i < glyphs.Length ? glyphs[i] : "◦", marks.GetMarking(i)));
+        }
+
         var formList = FormConverter.GetFormList(pk.Species, str.types, str.forms, pk.Context);
         HasForms = formList.Length > 1;
         FormNames = formList;
@@ -172,6 +188,26 @@ public partial class PokemonEditorViewModel : ViewModelBase
             _pk.Form = (byte)Math.Clamp(FormIndex, 0, FormNames.Count - 1);
 
         _pk.HeldItem = Math.Max(0, HeldItemIndex);
+
+        // Nickname: empty = not nicknamed (reset to the species' default name).
+        var defaultName = SpeciesName.GetSpeciesNameGeneration(_pk.Species, _pk.Language, (byte)_pk.Format);
+        var nick = (NicknameText ?? "").Trim();
+        if (nick.Length == 0)
+        {
+            _pk.Nickname = defaultName;
+            _pk.IsNicknamed = false;
+        }
+        else
+        {
+            _pk.Nickname = nick;
+            _pk.IsNicknamed = nick != defaultName;
+        }
+
+        if (_pk is IAppliedMarkings<bool> marks)
+        {
+            foreach (var mk in Markings)
+                marks.SetMarking(mk.Index, mk.IsSet);
+        }
 
         SetMove(0); SetMove(1); SetMove(2); SetMove(3);
 
@@ -320,5 +356,20 @@ public partial class MoveSlotViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(MaxPp));
         if (Pp > MaxPp) Pp = MaxPp;
+    }
+}
+
+/// <summary>A single toggleable marking (● ▲ ■ ♥ …).</summary>
+public partial class MarkingViewModel : ViewModelBase
+{
+    public int Index { get; }
+    public string Symbol { get; }
+    [ObservableProperty] public partial bool IsSet { get; set; }
+
+    public MarkingViewModel(int index, string symbol, bool isSet)
+    {
+        Index = index;
+        Symbol = symbol;
+        IsSet = isSet;
     }
 }

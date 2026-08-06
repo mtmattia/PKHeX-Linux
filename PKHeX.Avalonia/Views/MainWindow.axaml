@@ -87,6 +87,26 @@
                                 x:DataType="vm:PokemonEditorViewModel">
                         <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
 
+                        <TextBlock Text="Soprannome" Margin="0,6,0,0" Opacity="0.7" />
+                        <TextBox Text="{Binding NicknameText}" MaxLength="10"
+                                 PlaceholderText="(vuoto = nome della specie)" />
+
+                        <TextBlock Text="Simboli" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding HasMarkings}" />
+                        <ItemsControl ItemsSource="{Binding Markings}" IsVisible="{Binding HasMarkings}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MarkingViewModel">
+                                    <ToggleButton IsChecked="{Binding IsSet}" Content="{Binding Symbol}"
+                                                  FontSize="16" Width="42" Padding="0"
+                                                  HorizontalContentAlignment="Center" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <TextBlock Text="Specie" Margin="0,6,0,0" Opacity="0.7" />
                         <ComboBox ItemsSource="{Binding SpeciesNames}"
                                   SelectedIndex="{Binding Species}" HorizontalAlignment="Stretch" />
