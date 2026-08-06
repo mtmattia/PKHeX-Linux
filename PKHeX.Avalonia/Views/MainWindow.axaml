@@ -6,7 +6,8 @@
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
         x:Class="PKHeX.Avalonia.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="PKHeX.Avalonia"
+        Title="PKHeX Linux"
+        Icon="avares://PKHeX.Avalonia/Assets/icon.png"
         WindowStartupLocation="CenterScreen"
         Width="920" Height="820">
 
