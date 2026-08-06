@@ -15,6 +15,8 @@ public partial class SlotViewModel : ViewModelBase
     public bool IsParty { get; }
 
     public bool IsEmpty => Entity.Species == 0;
+    public bool IsShiny => !IsEmpty && Entity.IsShiny;
+    public bool IsEggSlot => !IsEmpty && Entity.IsEgg;
 
     public string SpeciesName => IsEmpty
         ? "—"

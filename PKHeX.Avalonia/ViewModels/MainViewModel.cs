@@ -33,6 +33,20 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnSelectedBoxIndexChanged(int value) => LoadBox(value);
 
+    [RelayCommand]
+    private void NextBox()
+    {
+        if (SelectedBoxIndex < BoxNames.Count - 1)
+            SelectedBoxIndex++;
+    }
+
+    [RelayCommand]
+    private void PrevBox()
+    {
+        if (SelectedBoxIndex > 0)
+            SelectedBoxIndex--;
+    }
+
     [ObservableProperty]
     public partial SlotViewModel? SelectedSlot { get; set; }
 
