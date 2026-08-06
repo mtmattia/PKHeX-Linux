@@ -51,14 +51,55 @@ public partial class MainViewModel : ViewModelBase
     private void OnSubEditorApplied() =>
         StatusText = "Modifiche applicate (ricordati di premere 💾 Salva per scrivere sul file).";
 
+    [ObservableProperty]
+    public partial bool IsEmptySlotSelected { get; set; }
+
     partial void OnSelectedSlotChanged(SlotViewModel? value)
     {
+        IsEmptySlotSelected = value is { IsEmpty: true };
+        CreatePokemonCommand.NotifyCanExecuteChanged();
         if (_sav is not { } sav || value is null || value.IsEmpty)
         {
             Editor = null;
             return;
         }
         Editor = new PokemonEditorViewModel(sav, value.Entity, value.Box, value.Slot, value.IsParty, OnEditorApplied);
+    }
+
+    /// <summary>Creates a fresh Pokémon in the selected empty slot, then opens the editor on it.</summary>
+    [RelayCommand(CanExecute = nameof(IsEmptySlotSelected))]
+    private void CreatePokemon()
+    {
+        if (_sav is not { } sav || SelectedSlot is not { IsEmpty: true } slot)
+            return;
+
+        var pk = sav.BlankPKM;
+        pk.Species = 1; // sensible default; the user edits it right away
+        pk.Version = sav.Version;
+        if (sav.Language > 0)
+            pk.Language = sav.Language;
+        pk.OriginalTrainerName = sav.OT;
+        pk.TID16 = sav.TID16;
+        pk.SID16 = sav.SID16;
+        pk.OriginalTrainerGender = sav.Gender;
+        pk.Ball = 4; // Poké Ball
+        pk.CurrentLevel = 5;
+        pk.MetLevel = 5;
+        pk.PID = EntityPID.GetRandomPID(Util.Rand, pk.Species, 0, sav.Version, Nature.Hardy, 0, Util.Rand.Rand32());
+        pk.SetRandomIVs();
+        pk.Heal();
+        pk.RefreshChecksum();
+
+        if (slot.IsParty)
+            sav.SetPartySlotAtIndex(pk, slot.Slot);
+        else
+            sav.SetBoxSlotAtIndex(pk, slot.Box, slot.Slot);
+
+        int slotIndex = slot.Slot;
+        LoadBox(SelectedBoxIndex);
+        if (slotIndex >= 0 && slotIndex < CurrentBox.Count)
+            SelectedSlot = CurrentBox[slotIndex]; // reselect → opens the editor on the new Pokémon
+        StatusText = "Nuovo Pokémon creato — modificalo e premi 💾 Salva.";
     }
 
     private void OnEditorApplied()

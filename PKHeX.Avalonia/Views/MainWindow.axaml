@@ -78,6 +78,19 @@
                 </ListBox>
             </ScrollViewer>
 
+            <!-- Slot vuoto: crea un nuovo Pokémon -->
+            <Border Grid.Column="2" Width="330" Padding="12"
+                    Background="#22808080"
+                    IsVisible="{Binding IsEmptySlotSelected}">
+                <StackPanel VerticalAlignment="Center" Spacing="12">
+                    <TextBlock Text="Slot vuoto" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" />
+                    <TextBlock Text="Crea un nuovo Pokémon in questo slot, poi modificane specie, mosse e tutto il resto."
+                               TextWrapping="Wrap" Opacity="0.8" TextAlignment="Center" />
+                    <Button Content="➕ Crea Pokémon" Command="{Binding CreatePokemonCommand}"
+                            HorizontalAlignment="Center" Padding="16,8" />
+                </StackPanel>
+            </Border>
+
             <!-- Editor panel -->
             <Border Grid.Column="2" Width="330" Padding="12"
                     Background="#22808080"
