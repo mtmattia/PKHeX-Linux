@@ -86,21 +86,13 @@
                                 x:DataType="vm:PokemonEditorViewModel">
                         <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
 
-                        <!-- Info di sola lettura -->
-                        <Border Background="#18808080" CornerRadius="4" Padding="8,6" Margin="0,4,0,0">
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="{Binding GenderSymbol, StringFormat='Genere: {0}'}" FontSize="12" />
-                                <TextBlock Text="{Binding HeldItemName, StringFormat='Strumento: {0}'}" FontSize="12" />
-                                <TextBlock Text="{Binding MetLocationName, StringFormat='Zona di cattura: {0}'}" FontSize="12" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding MetLevel, StringFormat='Livello di cattura: {0}'}" FontSize="12" />
-                                <TextBlock Text="{Binding MetDateText, StringFormat='Data di cattura: {0}'}" FontSize="12"
-                                           IsVisible="{Binding HasMetDate}" />
-                            </StackPanel>
-                        </Border>
-
                         <TextBlock Text="Specie" Margin="0,6,0,0" Opacity="0.7" />
                         <ComboBox ItemsSource="{Binding SpeciesNames}"
                                   SelectedIndex="{Binding Species}" HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Genere" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding CanEditGender}" />
+                        <ComboBox ItemsSource="{Binding GenderNames}" SelectedIndex="{Binding GenderIndex}"
+                                  HorizontalAlignment="Stretch" IsVisible="{Binding CanEditGender}" />
 
                         <TextBlock Text="Livello" Margin="0,6,0,0" Opacity="0.7" />
                         <NumericUpDown Value="{Binding Level}" Minimum="1" Maximum="100"
@@ -114,11 +106,52 @@
                         <ComboBox ItemsSource="{Binding FormNames}" SelectedIndex="{Binding FormIndex}"
                                   HorizontalAlignment="Stretch" IsVisible="{Binding HasForms}" />
 
-                        <TextBlock Text="Mosse" Margin="0,6,0,0" Opacity="0.7" />
-                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move1}" HorizontalAlignment="Stretch" />
-                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move2}" HorizontalAlignment="Stretch" />
-                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move3}" HorizontalAlignment="Stretch" />
-                        <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move4}" HorizontalAlignment="Stretch" />
+                        <TextBlock Text="Strumento tenuto" Margin="0,6,0,0" Opacity="0.7" />
+                        <ComboBox ItemsSource="{Binding ItemNames}" SelectedIndex="{Binding HeldItemIndex}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Mosse (PP / max · PP Up)" Margin="0,6,0,0" Opacity="0.7" />
+                        <ItemsControl ItemsSource="{Binding Moves}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MoveSlotViewModel">
+                                    <Grid ColumnDefinitions="*,54,Auto,44" ColumnSpacing="4" Margin="0,1">
+                                        <ComboBox Grid.Column="0" ItemsSource="{Binding MoveNames}"
+                                                  SelectedIndex="{Binding MoveIndex}" HorizontalAlignment="Stretch" />
+                                        <NumericUpDown Grid.Column="1" Value="{Binding Pp}" Minimum="0"
+                                                       Maximum="{Binding MaxPp}" FormatString="0" MinWidth="0"
+                                                       ButtonSpinnerLocation="Left" ToolTip.Tip="PP attuali" />
+                                        <TextBlock Grid.Column="2" Text="{Binding MaxPp, StringFormat='/ {0}'}"
+                                                   VerticalAlignment="Center" Opacity="0.7" />
+                                        <NumericUpDown Grid.Column="3" Value="{Binding PpUps}" Minimum="0" Maximum="3"
+                                                       FormatString="0" MinWidth="0" ShowButtonSpinner="False"
+                                                       ToolTip.Tip="PP Up (0–3)" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Squadra: HP e stato (solo party) -->
+                        <StackPanel Spacing="3" IsVisible="{Binding IsParty}">
+                            <TextBlock Text="Punti Salute (squadra)" Margin="0,8,0,0" Opacity="0.7" />
+                            <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                                <NumericUpDown Grid.Column="0" Value="{Binding HpCurrent}" Minimum="0"
+                                               Maximum="{Binding HpMax}" FormatString="0" MinWidth="0" ToolTip.Tip="HP attuali" />
+                                <TextBlock Grid.Column="1" Text="{Binding HpMax, StringFormat='/ {0}'}" VerticalAlignment="Center" Opacity="0.7" />
+                                <ComboBox Grid.Column="2" ItemsSource="{Binding StatusNames}" SelectedIndex="{Binding StatusIndex}"
+                                          HorizontalAlignment="Stretch" ToolTip.Tip="Stato" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Cattura -->
+                        <TextBlock Text="Cattura" Margin="0,8,0,0" Opacity="0.7" />
+                        <ComboBox ItemsSource="{Binding LocationNames}" SelectedIndex="{Binding MetLocationIndex}"
+                                  HorizontalAlignment="Stretch" ToolTip.Tip="Zona di cattura" />
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Text="Livello" VerticalAlignment="Center" Opacity="0.7" />
+                            <NumericUpDown Grid.Column="1" Value="{Binding MetLevelValue}" Minimum="0" Maximum="100" FormatString="0" MinWidth="0" />
+                            <TextBlock Grid.Column="2" Text="{Binding MetDateText, StringFormat='Data: {0}'}"
+                                       VerticalAlignment="Center" Opacity="0.6" FontSize="12" IsVisible="{Binding HasMetDate}" />
+                        </Grid>
 
                         <TextBlock Text="Statistiche" Margin="0,6,0,0" Opacity="0.7" />
                         <Grid ColumnDefinitions="Auto,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
