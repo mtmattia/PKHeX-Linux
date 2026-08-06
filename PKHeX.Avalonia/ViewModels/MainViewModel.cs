@@ -66,6 +66,26 @@ public partial class MainViewModel : ViewModelBase
         Editor = new PokemonEditorViewModel(sav, value.Entity, value.Box, value.Slot, value.IsParty, OnEditorApplied);
     }
 
+    /// <summary>Removes the Pokémon in the selected slot (box: clear slot; party: delete + compact).</summary>
+    public void RemoveSelectedPokemon()
+    {
+        if (_sav is not { } sav || SelectedSlot is not { IsEmpty: false } slot)
+            return;
+
+        if (slot.IsParty)
+            sav.DeletePartySlot(slot.Slot);
+        else
+            sav.SetBoxSlotAtIndex(sav.BlankPKM, slot.Box, slot.Slot);
+
+        int slotIndex = slot.Slot;
+        LoadBox(SelectedBoxIndex);
+        if (slotIndex >= 0 && slotIndex < CurrentBox.Count)
+            SelectedSlot = CurrentBox[slotIndex];
+        else
+            SelectedSlot = null;
+        StatusText = "Pokémon rimosso — premi 💾 Salva per scrivere sul file.";
+    }
+
     /// <summary>Creates a fresh Pokémon in the selected empty slot, then opens the editor on it.</summary>
     [RelayCommand(CanExecute = nameof(IsEmptySlotSelected))]
     private void CreatePokemon()

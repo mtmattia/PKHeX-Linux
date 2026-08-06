@@ -278,6 +278,11 @@
                                     Command="{Binding ExportShowdownCommand}"
                                     HorizontalAlignment="Stretch" />
                         </Grid>
+
+                        <Border Height="1" Background="#40808080" Margin="0,12,0,0" />
+                        <Button Content="🗑 Rimuovi Pokémon" Click="OnRemoveClicked"
+                                HorizontalAlignment="Stretch" Margin="0,4,0,0"
+                                Background="#33E04848" Foreground="#FFD0D0" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
