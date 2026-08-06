@@ -115,6 +115,9 @@
                                TextWrapping="Wrap" Opacity="0.8" TextAlignment="Center" />
                     <Button Content="➕ Crea Pokémon" Command="{Binding CreatePokemonCommand}"
                             HorizontalAlignment="Center" Padding="16,8" />
+                    <Button Content="🥚 Crea Uovo (legit)" Command="{Binding CreateEggCommand}"
+                            HorizontalAlignment="Center" Padding="16,8"
+                            IsVisible="{Binding SupportsEggs}" />
                 </StackPanel>
             </Border>
 
@@ -126,6 +129,16 @@
                     <StackPanel DataContext="{Binding Editor}" Spacing="6"
                                 x:DataType="vm:PokemonEditorViewModel">
                         <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
+
+                        <Border CornerRadius="4" Padding="8,5" Margin="0,4,0,0" Background="#18808080">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding LegalityText}" FontWeight="SemiBold" />
+                                <Expander IsVisible="{Binding HasLegalityReport}" Padding="0">
+                                    <Expander.Header><TextBlock Text="Dettagli legalità" FontSize="12" /></Expander.Header>
+                                    <TextBlock Text="{Binding LegalityReport}" TextWrapping="Wrap" FontSize="12" Opacity="0.85" />
+                                </Expander>
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Text="Soprannome" Margin="0,6,0,0" Opacity="0.7" />
                         <TextBox Text="{Binding NicknameText}" MaxLength="10"

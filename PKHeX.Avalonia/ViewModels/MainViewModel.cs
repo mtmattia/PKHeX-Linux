@@ -72,6 +72,7 @@ public partial class MainViewModel : ViewModelBase
     {
         IsEmptySlotSelected = value is { IsEmpty: true };
         CreatePokemonCommand.NotifyCanExecuteChanged();
+        CreateEggCommand.NotifyCanExecuteChanged();
         if (_sav is not { } sav || value is null || value.IsEmpty)
         {
             Editor = null;
@@ -109,7 +110,7 @@ public partial class MainViewModel : ViewModelBase
 
         var pk = sav.BlankPKM;
         pk.Species = 1; // sensible default; the user edits it right away
-        pk.Version = sav.Version;
+        pk.Version = ConcreteVersion(sav.Version);
         if (sav.Language > 0)
             pk.Language = sav.Language;
         pk.OriginalTrainerName = sav.OT;
@@ -135,6 +136,67 @@ public partial class MainViewModel : ViewModelBase
             SelectedSlot = CurrentBox[slotIndex]; // reselect → opens the editor on the new Pokémon
         StatusText = "Nuovo Pokémon creato — modificalo e premi 💾 Salva.";
     }
+
+    public bool SupportsEggs { get; private set; }
+    private bool CanCreateEgg => IsEmptySlotSelected && SupportsEggs;
+
+    /// <summary>Creates a legit Gen3 egg (proper egg/hatch location, level 5, Poké Ball) in the empty slot.</summary>
+    [RelayCommand(CanExecute = nameof(CanCreateEgg))]
+    private void CreateEgg()
+    {
+        if (_sav is not { } sav || SelectedSlot is not { IsEmpty: true } slot)
+            return;
+
+        PKM pk;
+        try
+        {
+            // EncounterEgg3 needs a CONCRETE version (sav.Version can be a group like RS).
+            var ver = ConcreteVersion(sav.Version);
+            // EncounterEgg3 fills in the correct met data, hatch location, level and ball,
+            // but "force-hatches" it — turn the result back into an unhatched egg. In Gen3
+            // an unhatched egg keeps the hatch location in MetLocation and has met level 0.
+            var enc = new EncounterEgg3(DefaultEggSpecies(ver), ver);
+            pk = enc.ConvertToPKM(sav);
+            pk.IsEgg = true;
+            pk.CurrentLevel = EggStateLegality.EggLevel23;   // 5
+            pk.MetLevel = EggStateLegality.EggMetLevel34;    // 0
+            pk.Nickname = SpeciesName.GetEggName(pk.Language, pk.Format);
+            pk.IsNicknamed = true;
+            pk.OriginalTrainerFriendship = (byte)EggStateLegality.GetMaximumEggHatchCycles(pk);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Impossibile creare l'uovo: {ex.Message}";
+            return;
+        }
+        pk.RefreshChecksum();
+
+        if (slot.IsParty)
+            sav.SetPartySlotAtIndex(pk, slot.Slot);
+        else
+            sav.SetBoxSlotAtIndex(pk, slot.Box, slot.Slot);
+
+        int slotIndex = slot.Slot;
+        LoadBox(SelectedBoxIndex);
+        if (slotIndex >= 0 && slotIndex < CurrentBox.Count)
+            SelectedSlot = CurrentBox[slotIndex];
+        StatusText = "Uovo legit creato — cambia la specie (breedabile) e premi 💾 Salva.";
+    }
+
+    // A breedable species native to the loaded game, so the default egg is legal.
+    private static ushort DefaultEggSpecies(GameVersion v) => v switch
+    {
+        GameVersion.FR or GameVersion.LG => 19,  // Rattata (Kanto)
+        _ => 263,                                 // Zigzagoon (Hoenn)
+    };
+
+    // Resolve a version group (RS/FRLG) to a concrete game the encounter templates accept.
+    private static GameVersion ConcreteVersion(GameVersion v) => v switch
+    {
+        GameVersion.RS => GameVersion.S,
+        GameVersion.FRLG => GameVersion.FR,
+        _ => v,
+    };
 
     private void OnEditorApplied()
     {
@@ -169,6 +231,7 @@ public partial class MainViewModel : ViewModelBase
             for (int b = 0; b < sav.BoxCount; b++)
                 BoxNames.Add($"Box {b + 1}");
 
+            SupportsEggs = sav.Generation == 3;
             Trainer = new TrainerViewModel(sav, OnSubEditorApplied);
             Bag = new BagViewModel(sav, OnSubEditorApplied);
             Dex = new DexViewModel(sav, OnSubEditorApplied);

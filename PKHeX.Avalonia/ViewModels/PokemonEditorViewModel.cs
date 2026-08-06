@@ -96,6 +96,12 @@ public partial class PokemonEditorViewModel : ViewModelBase
         ? $"Squadra · Slot {_slot + 1}"
         : $"Box {_box + 1} · Slot {_slot + 1}";
 
+    // Legality (computed on load; the editor is rebuilt after each Apply, so it refreshes).
+    public bool LegalityValid { get; private set; }
+    public string LegalityText { get; private set; } = "";
+    public string LegalityReport { get; private set; } = "";
+    public bool HasLegalityReport => LegalityReport.Length != 0;
+
     public PokemonEditorViewModel(SaveFile sav, PKM pk, int box, int slot, bool isParty, Action onApplied)
     {
         _sav = sav;
@@ -161,6 +167,26 @@ public partial class PokemonEditorViewModel : ViewModelBase
 
         foreach (var info in RibbonInfo.GetRibbonInfo(pk))
             Ribbons.Add(new RibbonEntryViewModel(info));
+
+        RefreshLegality();
+    }
+
+    private void RefreshLegality()
+    {
+        try
+        {
+            var la = new LegalityAnalysis(_pk);
+            LegalityValid = la.Valid;
+            LegalityText = la.Valid ? "✅ Legale" : "⚠️ Potenzialmente illegale";
+            var report = la.Report();
+            LegalityReport = la.Valid ? "" : report;
+        }
+        catch (Exception ex)
+        {
+            LegalityValid = false;
+            LegalityText = "⚠️ Legalità non determinabile";
+            LegalityReport = ex.Message;
+        }
     }
 
     [RelayCommand]
