@@ -47,6 +47,19 @@ public partial class PokemonEditorViewModel : ViewModelBase
 
     [ObservableProperty] public partial bool IsShiny { get; set; }
 
+    // Form selection (Unown, Castform, Deoxys, …). Only shown when >1 form exists.
+    public bool HasForms { get; }
+    public IReadOnlyList<string> FormNames { get; } = [];
+    [ObservableProperty] public partial int FormIndex { get; set; }
+
+    // Read-only info surfaced in the editor.
+    public string GenderSymbol { get; }
+    public string HeldItemName { get; }
+    public string MetLocationName { get; }
+    public int MetLevel { get; }
+    public string MetDateText { get; }
+    public bool HasMetDate { get; }
+
     // Contest condition (bellezza, acume, ...). Only when the format stores them.
     public bool HasContest { get; }
     [ObservableProperty] public partial int ConCool { get; set; }
@@ -88,6 +101,22 @@ public partial class PokemonEditorViewModel : ViewModelBase
         EvSpa = pk.EV_SPA; EvSpd = pk.EV_SPD; EvSpe = pk.EV_SPE;
         IsShiny = pk.IsShiny;
 
+        var str = GameInfo.Strings;
+
+        var formList = FormConverter.GetFormList(pk.Species, str.types, str.forms, pk.Context);
+        HasForms = formList.Length > 1;
+        FormNames = formList;
+        FormIndex = pk.Form < formList.Length ? pk.Form : 0;
+
+        GenderSymbol = pk.Gender switch { 0 => "♂ Maschio", 1 => "♀ Femmina", _ => "⚲ Senza genere" };
+        HeldItemName = pk.HeldItem > 0
+            ? str.GetItemStrings(pk.Context, pk.Version)[pk.HeldItem]
+            : "nessuno";
+        MetLocationName = str.GetLocationName(false, pk.MetLocation, (byte)pk.Format, (byte)pk.Generation, pk.Version);
+        MetLevel = pk.MetLevel;
+        MetDateText = pk.MetDate?.ToString("yyyy-MM-dd") ?? "—";
+        HasMetDate = pk.MetDate is not null;
+
         if (pk is IContestStats cs)
         {
             HasContest = true;
@@ -108,6 +137,8 @@ public partial class PokemonEditorViewModel : ViewModelBase
         // Use the helper: for PID-based generations (Gen 3/4) this rerolls the PID
         // so the nature actually changes, instead of a silent no-op.
         _pk.SetNature((Nature)NatureIndex);
+        if (HasForms)
+            _pk.Form = (byte)Math.Clamp(FormIndex, 0, FormNames.Count - 1);
         _pk.Move1 = (ushort)Move1;
         _pk.Move2 = (ushort)Move2;
         _pk.Move3 = (ushort)Move3;

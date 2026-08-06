@@ -58,7 +58,8 @@
                             <Border Width="150" Height="66" Padding="4"
                                     CornerRadius="6"
                                     BorderBrush="#40808080" BorderThickness="1"
-                                    Background="#18808080">
+                                    Background="#18808080"
+                                    ToolTip.Tip="{Binding Tooltip}">
                                 <Grid ColumnDefinitions="64,*">
                                     <Image Grid.Column="0" Source="{Binding Sprite}"
                                            Width="64" Height="56"
@@ -85,6 +86,18 @@
                                 x:DataType="vm:PokemonEditorViewModel">
                         <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
 
+                        <!-- Info di sola lettura -->
+                        <Border Background="#18808080" CornerRadius="4" Padding="8,6" Margin="0,4,0,0">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding GenderSymbol, StringFormat='Genere: {0}'}" FontSize="12" />
+                                <TextBlock Text="{Binding HeldItemName, StringFormat='Strumento: {0}'}" FontSize="12" />
+                                <TextBlock Text="{Binding MetLocationName, StringFormat='Zona di cattura: {0}'}" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding MetLevel, StringFormat='Livello di cattura: {0}'}" FontSize="12" />
+                                <TextBlock Text="{Binding MetDateText, StringFormat='Data di cattura: {0}'}" FontSize="12"
+                                           IsVisible="{Binding HasMetDate}" />
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Text="Specie" Margin="0,6,0,0" Opacity="0.7" />
                         <ComboBox ItemsSource="{Binding SpeciesNames}"
                                   SelectedIndex="{Binding Species}" HorizontalAlignment="Stretch" />
@@ -96,6 +109,10 @@
                         <TextBlock Text="Natura" Margin="0,6,0,0" Opacity="0.7" />
                         <ComboBox ItemsSource="{Binding NatureNames}"
                                   SelectedIndex="{Binding NatureIndex}" HorizontalAlignment="Stretch" />
+
+                        <TextBlock Text="Forma" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding HasForms}" />
+                        <ComboBox ItemsSource="{Binding FormNames}" SelectedIndex="{Binding FormIndex}"
+                                  HorizontalAlignment="Stretch" IsVisible="{Binding HasForms}" />
 
                         <TextBlock Text="Mosse" Margin="0,6,0,0" Opacity="0.7" />
                         <ComboBox ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding Move1}" HorizontalAlignment="Stretch" />
