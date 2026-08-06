@@ -39,4 +39,25 @@ public partial class MainWindow : Window
         if (path is not null)
             vm.LoadSaveFromPath(path);
     }
+
+    private async void OnSaveAsClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.HasSave)
+            return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Salva il salvataggio con un nome",
+            DefaultExtension = "sav",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Salvataggio Pokémon") { Patterns = new[] { "*.sav" } },
+                FilePickerFileTypes.All,
+            },
+        });
+
+        var path = file?.TryGetLocalPath();
+        if (path is not null)
+            vm.SaveAs(path);
+    }
 }

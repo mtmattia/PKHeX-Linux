@@ -1,11 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PKHeX.Core;
 
 namespace PKHeX.Avalonia.ViewModels;
 
-/// <summary>Editor for the Pokédex (seen/caught) and raw event flags.</summary>
+/// <summary>Editor for the Pokédex (seen/caught) and event flags (named + raw).</summary>
 public partial class DexViewModel : ViewModelBase
 {
     private readonly SaveFile _sav;
@@ -21,6 +23,12 @@ public partial class DexViewModel : ViewModelBase
     [ObservableProperty] public partial int FlagNumber { get; set; }
     [ObservableProperty] public partial bool FlagValue { get; set; }
 
+    // Named event flags (research data), with a text filter.
+    private readonly List<NamedFlagViewModel> _allNamed = new();
+    public ObservableCollection<NamedFlagViewModel> NamedFlags { get; } = new();
+    public bool HasNamedFlags => _allNamed.Count > 0;
+    [ObservableProperty] public partial string FlagSearch { get; set; } = "";
+
     private readonly IEventFlagArray? _flags;
 
     public DexViewModel(SaveFile sav, Action onApplied)
@@ -33,9 +41,26 @@ public partial class DexViewModel : ViewModelBase
             _flags = fa;
             HasEventFlags = true;
             EventFlagCount = fa.EventFlagCount;
+
+            foreach (var e in EventFlagCatalog.Load(sav))
+            {
+                if ((uint)e.Number < (uint)EventFlagCount)
+                    _allNamed.Add(new NamedFlagViewModel(fa, e, onApplied));
+            }
+            foreach (var f in _allNamed)
+                NamedFlags.Add(f);
         }
         RefreshCounts();
         if (HasEventFlags) FlagValue = _flags!.GetEventFlag(0);
+    }
+
+    partial void OnFlagSearchChanged(string value)
+    {
+        var q = value.Trim();
+        NamedFlags.Clear();
+        foreach (var f in _allNamed)
+            if (q.Length == 0 || f.Label.Contains(q, StringComparison.OrdinalIgnoreCase) || f.Number.ToString().Contains(q))
+                NamedFlags.Add(f);
     }
 
     private void RefreshCounts()
@@ -80,5 +105,37 @@ public partial class DexViewModel : ViewModelBase
             return;
         _flags.SetEventFlag(FlagNumber, FlagValue);
         _onApplied();
+    }
+}
+
+/// <summary>A single named event flag; toggling the checkbox writes it live into the save.</summary>
+public sealed partial class NamedFlagViewModel : ViewModelBase
+{
+    private readonly IEventFlagArray _flags;
+    private readonly Action _onChanged;
+
+    public int Number { get; }
+    public string Label { get; }
+    public string Display => $"[{Number}] {Label}";
+
+    public bool IsSet
+    {
+        get => _flags.GetEventFlag(Number);
+        set
+        {
+            if (value == _flags.GetEventFlag(Number))
+                return;
+            _flags.SetEventFlag(Number, value);
+            OnPropertyChanged();
+            _onChanged();
+        }
+    }
+
+    public NamedFlagViewModel(IEventFlagArray flags, FlagEntry entry, Action onChanged)
+    {
+        _flags = flags;
+        Number = entry.Number;
+        Label = entry.Label;
+        _onChanged = onChanged;
     }
 }

@@ -134,13 +134,39 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(HasSave))]
     private void Save()
     {
-        if (_sav is not { } sav || _path is null)
+        if (_path is not null)
+            WriteTo(_path, backupOriginal: true);
+    }
+
+    /// <summary>Saves to a new path chosen by the user ("Salva con nome…").</summary>
+    public void SaveAs(string path)
+    {
+        WriteTo(path, backupOriginal: false);
+        _path = path; // subsequent quick-saves target the new file
+    }
+
+    private void WriteTo(string path, bool backupOriginal)
+    {
+        if (_sav is not { } sav)
             return;
         try
         {
+            // Safety net: preserve the pristine original as a one-time .bak, so a bad
+            // edit (or a bug) can always be undone by restoring the backup.
+            if (backupOriginal)
+            {
+                var bak = path + ".bak";
+                if (File.Exists(path) && !File.Exists(bak))
+                    File.Copy(path, bak);
+            }
+
             var data = sav.Write();
-            File.WriteAllBytes(_path, data.ToArray());
-            StatusText = $"Salvato: {Path.GetFileName(_path)}";
+            File.WriteAllBytes(path, data.ToArray());
+
+            var bakPath = path + ".bak";
+            StatusText = File.Exists(bakPath)
+                ? $"Salvato: {Path.GetFileName(path)}  •  backup originale in {Path.GetFileName(bakPath)}"
+                : $"Salvato: {Path.GetFileName(path)}";
         }
         catch (Exception ex)
         {
