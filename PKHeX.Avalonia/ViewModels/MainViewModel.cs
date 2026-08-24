@@ -198,6 +198,32 @@ public partial class MainViewModel : ViewModelBase
         _ => v,
     };
 
+    // Detect the game language from the Pokémon it contains (the Gen3 save-level flag
+    // is unreliable — returns English by default), falling back to the reported language.
+    private static string DetectLanguageCode(SaveFile sav)
+    {
+        var counts = new int[16];
+        void Tally(IEnumerable<PKM> pkms)
+        {
+            foreach (var pk in pkms)
+                if (pk.Species > 0 && (uint)pk.Language < counts.Length)
+                    counts[pk.Language]++;
+        }
+        Tally(sav.PartyData);
+        for (int b = 0; b < sav.BoxCount; b++)
+            Tally(sav.GetBoxData(b));
+
+        int best = -1, bestCount = 0;
+        for (int i = 0; i < counts.Length; i++)
+            if (counts[i] > bestCount) { bestCount = counts[i]; best = i; }
+
+        int lang = best >= 0 ? best : sav.Language;
+        return lang switch
+        {
+            1 => "JPN", 2 => "ENG", 3 => "FRE", 4 => "ITA", 5 => "GER", 7 => "SPA", 8 => "KOR", _ => "?",
+        };
+    }
+
     private void OnEditorApplied()
     {
         int slotIndex = SelectedSlot?.Slot ?? -1;
@@ -223,7 +249,7 @@ public partial class MainViewModel : ViewModelBase
             _path = path;
             HasSave = true;
 
-            SaveInfo = $"{sav.Version}  •  OT: {sav.OT}  •  {sav.BoxCount} box × {sav.BoxSlotCount} slot  •  Gen {sav.Generation}";
+            SaveInfo = $"OT: {sav.OT}  ·  {DetectLanguageCode(sav)}";
             StatusText = $"Caricato: {Path.GetFileName(path)}";
 
             BoxNames.Clear();

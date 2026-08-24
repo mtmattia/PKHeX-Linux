@@ -70,6 +70,9 @@ public partial class SlotViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Compact "Name ♀ (lv. 12)" label for hover/header.</summary>
+    public string NameLevel => IsEmpty ? "" : $"{DisplayLine} (lv. {Entity.CurrentLevel})";
+
     public Bitmap? Sprite => SpriteLoader.GetSprite(Entity);
 
     public SlotViewModel(PKM entity, int box, int slot, bool isParty = false)

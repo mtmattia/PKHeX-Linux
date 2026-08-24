@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PKHeX.Core;
@@ -34,6 +35,18 @@ public partial class PokemonEditorViewModel : ViewModelBase
     [ObservableProperty] public partial int NatureIndex { get; set; }
     [ObservableProperty] public partial int GenderIndex { get; set; }
     public bool CanEditGender { get; }
+    public string GenderSymbol => GenderIndex == 1 ? "♀" : CanEditGender ? "♂" : "⚲";
+
+    partial void OnGenderIndexChanged(int value) => OnPropertyChanged(nameof(GenderSymbol));
+
+    /// <summary>Click on the gender symbol flips it (no dropdown); genderless stays fixed.</summary>
+    [RelayCommand]
+    private void ToggleGender()
+    {
+        if (CanEditGender)
+            GenderIndex ^= 1;
+    }
+
     [ObservableProperty] public partial int HeldItemIndex { get; set; }
 
     public ObservableCollection<MoveSlotViewModel> Moves { get; } = new();
@@ -86,8 +99,56 @@ public partial class PokemonEditorViewModel : ViewModelBase
     [ObservableProperty] public partial int ConTough { get; set; }
     [ObservableProperty] public partial int ConSheen { get; set; }
 
-    /// <summary>Ribbons (fiocchi) applicable to this entity.</summary>
+    /// <summary>Sheen (Lucentezza) exists in Gen 3/4/8.</summary>
+    public bool HasSheen => HasContest && (_pk.Format is 3 or 4 or 8);
+    /// <summary>Max stars: 12 in Gen4/8, 10 in Gen3.</summary>
+    private bool SheenIs12 => _pk.Format is 4 or 8;
+    public int SheenMax => SheenIs12 ? 12 : 10;
+
+    /// <summary>Number of lit stars for the current sheen (game formula; 0 sheen = 0).</summary>
+    public int SheenSparkles => ConSheen == 0 ? 0
+        : SheenIs12 ? (ConSheen == 255 ? 12 : 12 * ConSheen / 256)
+        : (ConSheen == 255 ? 10 : ConSheen / 29 + 1);
+
+    /// <summary>Clickable star toggles for the sheen.</summary>
+    public ObservableCollection<SheenStarViewModel> SheenStars { get; } = new();
+
+    partial void OnConSheenChanged(int value)
+    {
+        OnPropertyChanged(nameof(SheenSparkles));
+        UpdateSheenStars();
+    }
+
+    private void UpdateSheenStars()
+    {
+        int lit = SheenSparkles;
+        foreach (var s in SheenStars)
+            s.Lit = s.Index <= lit;
+    }
+
+    // Click on star N: set that many sparkles (or clear one if it's already lit).
+    private void SetSheen(int stars)
+    {
+        int target = SheenSparkles == stars ? stars - 1 : stars;
+        ConSheen = SparklesToSheen(target);
+    }
+
+    // Inverse of the sparkle formula: minimum sheen that yields n stars.
+    private int SparklesToSheen(int n)
+    {
+        if (n <= 0) return 0;
+        if (SheenIs12) return n >= 12 ? 255 : (int)System.Math.Ceiling(n * 256.0 / 12);
+        return n >= 10 ? 255 : (n == 1 ? 1 : (n - 1) * 29);
+    }
+
+    /// <summary>Ribbons (fiocchi) applicable to this entity (all, used on Apply).</summary>
     public ObservableCollection<RibbonEntryViewModel> Ribbons { get; } = new();
+    /// <summary>Contest ribbons (count-based Cool/Beauty/… ranks) — shown with Gare Pokémon.</summary>
+    public ObservableCollection<RibbonEntryViewModel> ContestRibbons { get; } = new();
+    /// <summary>Non-contest ribbons (boolean) — shown in the separate Fiocchi section.</summary>
+    public ObservableCollection<RibbonEntryViewModel> OtherRibbons { get; } = new();
+    public bool HasContestRibbons => ContestRibbons.Count > 0;
+    public bool HasOtherRibbons => OtherRibbons.Count > 0;
 
     /// <summary>Showdown set text used by the import/export controls.</summary>
     [ObservableProperty] public partial string ShowdownText { get; set; } = "";
@@ -165,8 +226,19 @@ public partial class PokemonEditorViewModel : ViewModelBase
             ConSmart = cs.ContestSmart; ConTough = cs.ContestTough; ConSheen = cs.ContestSheen;
         }
 
+        if (HasSheen)
+        {
+            for (int i = 1; i <= SheenMax; i++)
+                SheenStars.Add(new SheenStarViewModel(i, SetSheen));
+            UpdateSheenStars();
+        }
+
         foreach (var info in RibbonInfo.GetRibbonInfo(pk))
-            Ribbons.Add(new RibbonEntryViewModel(info));
+        {
+            var r = new RibbonEntryViewModel(info);
+            Ribbons.Add(r);
+            (r.IsBoolean ? OtherRibbons : ContestRibbons).Add(r); // count-based = contest ranks
+        }
 
         RefreshLegality();
     }
@@ -207,6 +279,18 @@ public partial class PokemonEditorViewModel : ViewModelBase
         {
             _pk.Nature = nature;
             _pk.Gender = gender;
+        }
+
+        // Shiny: SetShiny rerolls a shiny PID keeping nature/gender; for non-shiny the
+        // reroll above is already non-shiny (guard the rare chance it landed shiny).
+        if (IsShiny)
+        {
+            _pk.SetShiny();
+        }
+        else
+        {
+            while (_pk.IsShiny)
+                _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, gender, _pk.Version, nature, _pk.Form, _pk.PID);
         }
 
         _pk.CurrentLevel = (byte)Math.Clamp(Level, 1, 100);
@@ -361,7 +445,10 @@ public partial class MoveSlotViewModel : ViewModelBase
     [ObservableProperty] public partial int Pp { get; set; }
     [ObservableProperty] public partial int PpUps { get; set; }
 
+    /// <summary>Current max PP with the current PP Ups ("reali").</summary>
     public int MaxPp => _maxPp((ushort)Math.Max(0, MoveIndex), Math.Clamp(PpUps, 0, 3));
+    /// <summary>Absolute max PP with 3 PP Ups ("PPMAX").</summary>
+    public int MaxPpFull => _maxPp((ushort)Math.Max(0, MoveIndex), 3);
 
     public MoveSlotViewModel(IReadOnlyList<string> moveNames, int move, int pp, int ppUps, Func<ushort, int, int> maxPp)
     {
@@ -375,6 +462,7 @@ public partial class MoveSlotViewModel : ViewModelBase
     partial void OnMoveIndexChanged(int value)
     {
         OnPropertyChanged(nameof(MaxPp));
+        OnPropertyChanged(nameof(MaxPpFull));
         if (Pp > MaxPp) Pp = MaxPp;
     }
 
@@ -382,6 +470,29 @@ public partial class MoveSlotViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(MaxPp));
         if (Pp > MaxPp) Pp = MaxPp;
+    }
+}
+
+/// <summary>One clickable sheen star; lit ones are gold, the rest faint.</summary>
+public partial class SheenStarViewModel : ViewModelBase
+{
+    private static readonly IBrush On = new SolidColorBrush(Color.Parse("#F4B400"));
+    private static readonly IBrush Off = new SolidColorBrush(Color.Parse("#40000000"));
+    private readonly Action<int> _click;
+
+    public int Index { get; }
+    [ObservableProperty] public partial bool Lit { get; set; }
+    public IBrush StarBrush => Lit ? On : Off;
+
+    partial void OnLitChanged(bool value) => OnPropertyChanged(nameof(StarBrush));
+
+    [RelayCommand]
+    private void Click() => _click(Index);
+
+    public SheenStarViewModel(int index, Action<int> click)
+    {
+        Index = index;
+        _click = click;
     }
 }
 

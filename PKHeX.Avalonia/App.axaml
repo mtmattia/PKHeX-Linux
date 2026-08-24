@@ -2,8 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="PKHeX.Avalonia.App"
              xmlns:local="using:PKHeX.Avalonia"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Light">
+             <!-- Light theme so text stays dark/readable on the lavender background. -->
 
     <Application.DataTemplates>
         <local:ViewLocator />

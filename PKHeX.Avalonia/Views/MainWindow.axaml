@@ -15,89 +15,317 @@
         <vm:MainViewModel />
     </Design.DataContext>
 
-    <DockPanel>
-        <!-- Top bar -->
-        <Border DockPanel.Dock="Top" Padding="8" Background="#22808080">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button Name="OpenButton" Content="📂 Apri save…" Click="OnOpenClicked" />
-                <Button Content="💾 Salva" Command="{Binding SaveCommand}" />
-                <Button Content="💾 Salva con nome…" Click="OnSaveAsClicked" IsEnabled="{Binding HasSave}" />
-                <TextBlock Text="{Binding SaveInfo}" VerticalAlignment="Center" Opacity="0.8" />
+    <Window.Resources>
+        <LinearGradientBrush x:Key="AppBg" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#EDE6F8" Offset="0" />
+            <GradientStop Color="#C9B6ED" Offset="0.45" />
+            <GradientStop Color="#B6A0E6" Offset="1" />
+        </LinearGradientBrush>
+        <!-- ombra fittizia / base slot: cerchietto scuro appena percettibile -->
+        <RadialGradientBrush x:Key="SlotShadow">
+            <GradientStop Color="#22000000" Offset="0" />
+            <GradientStop Color="#12000000" Offset="0.55" />
+            <GradientStop Color="#00000000" Offset="1" />
+        </RadialGradientBrush>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- Pulsanti bianchi arrotondati stile HOME -->
+        <Style Selector="Button.pill">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Foreground" Value="#3A2B5C" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.pill /template/ ContentPresenter">
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="BoxShadow" Value="0 2 6 0 #33000000" />
+        </Style>
+        <Style Selector="Button.pill:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#EFE7FA" />
+        </Style>
+        <!-- celle sprite del Pokédex: nessun riquadro pulsante -->
+        <Style Selector="Button.dexcell">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Button.dexcell /template/ ContentPresenter">
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+        <Style Selector="Button.dexcell:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#33FFFFFF" />
+        </Style>
+        <!-- ComboBox senza contorno (per il selettore box) -->
+        <Style Selector="ComboBox.borderless">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="ComboBox.borderless /template/ Border#Background">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <!-- frecce cambio box -->
+        <Style Selector="Button.boxarrow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#3A2B5C" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+        <Style Selector="Button.boxarrow:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+        </Style>
+
+        <!-- TextBox "inline": niente riquadro, sottolineatura su hover/focus -->
+        <Style Selector="TextBox.inline">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+        <Style Selector="TextBox.inline /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="TextBox.inline:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#803A2B5C" />
+        </Style>
+        <Style Selector="TextBox.inline:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="BorderBrush" Value="#3A2B5C" />
+        </Style>
+        <!-- bottone genere: solo il simbolo, cliccabile -->
+        <Style Selector="Button.genderbtn">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Foreground" Value="#3A2B5C" />
+        </Style>
+        <Style Selector="Button.genderbtn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22FFFFFF" />
+        </Style>
+
+        <!-- stepper −/+ compatto per valori 0-4 -->
+        <Style Selector="Button.stepper">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#3A2B5C" />
+        </Style>
+        <Style Selector="Button.stepper:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#22000000" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <!-- stelle cliccabili (lucentezza) -->
+        <Style Selector="Button.star">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="1,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+
+        <!-- riquadro bianco arrotondato con ombra (come i pulsanti) per le sezioni -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="BoxShadow" Value="0 2 6 0 #33000000" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+        </Style>
+
+        <!-- marcature: solo il simbolo (niente quadrato), sbiadito se off, pieno se on -->
+        <Style Selector="ToggleButton.mark">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="2,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Foreground" Value="#553A2B5C" />
+        </Style>
+        <Style Selector="ToggleButton.mark:checked">
+            <Setter Property="Foreground" Value="#3A2B5C" />
+        </Style>
+        <Style Selector="ToggleButton.mark /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.mark:checked /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ToggleButton.mark:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- tooltip senza cornice di default (usiamo un contenuto personalizzato) -->
+        <Style Selector="ToolTip">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Background="{StaticResource AppBg}">
+        <!-- Top bar: sezione a sx, box al CENTRO finestra, OT a dx (colonna unica + allineamenti) -->
+        <Grid DockPanel.Dock="Top" Margin="8,8,12,4">
+            <Grid ColumnDefinitions="Auto,Auto" Height="40" VerticalAlignment="Center" HorizontalAlignment="Left">
+                <Border Grid.Column="0" Background="White" CornerRadius="12,0,0,12" Padding="12,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Image Source="avares://PKHeX.Avalonia/Assets/icon.png" Width="24" Height="24" />
+                        <ComboBox x:Name="SectionSelect"
+                                  SelectedIndex="{Binding #SectionTabs.SelectedIndex, Mode=TwoWay}"
+                                  Background="Transparent" BorderThickness="0"
+                                  Foreground="#E8792B" FontWeight="Bold" MinWidth="160">
+                            <ComboBoxItem>POKÉMON</ComboBoxItem>
+                            <ComboBoxItem>ALLENATORE</ComboBoxItem>
+                            <ComboBoxItem>ZAINO</ComboBoxItem>
+                            <ComboBoxItem>POKÉDEX</ComboBoxItem>
+                            <ComboBoxItem>EVENTI</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+                <!-- taglio diagonale a destra -->
+                <Polygon Grid.Column="1" Fill="White" Points="0,0 30,0 0,40" />
+            </Grid>
+            <!-- Selettore box al CENTRO della finestra: frecce + menu a tendina, senza contorno -->
+            <StackPanel Orientation="Horizontal" Spacing="4"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        IsVisible="{Binding HasSave}">
+                <Button Classes="boxarrow" Content="◀" Command="{Binding PrevBoxCommand}" />
+                <ComboBox Classes="borderless" ItemsSource="{Binding BoxNames}"
+                          SelectedIndex="{Binding SelectedBoxIndex}"
+                          Foreground="#3A2B5C" FontWeight="Bold" FontSize="15"
+                          MinWidth="130" HorizontalContentAlignment="Center" />
+                <Button Classes="boxarrow" Content="▶" Command="{Binding NextBoxCommand}" />
             </StackPanel>
-        </Border>
 
-        <!-- Status bar -->
-        <Border DockPanel.Dock="Bottom" Padding="8,4" Background="#22808080">
-            <TextBlock Text="{Binding StatusText}" />
-        </Border>
+            <TextBlock Text="{Binding SaveInfo}" VerticalAlignment="Center" HorizontalAlignment="Right"
+                       Foreground="#3A2B5C" FontWeight="SemiBold" />
+        </Grid>
 
-        <!-- Body: tabs -->
-        <TabControl>
+        <!-- Bottom bar: pulsanti a sx, stato a dx -->
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="8,4,12,8">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Name="OpenButton" Classes="pill" Content="📂 Apri" Click="OnOpenClicked" />
+                <Button Classes="pill" Content="💾 Salva" Command="{Binding SaveCommand}" />
+                <Button Classes="pill" Content="💾 Salva con nome…" Click="OnSaveAsClicked" IsEnabled="{Binding HasSave}" />
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{Binding StatusText}" VerticalAlignment="Center"
+                       Foreground="#3A2B5C" TextTrimming="CharacterEllipsis" />
+        </Grid>
+
+        <!-- Body: tabs (header nascosto, pilotato dal selettore in alto) -->
+        <TabControl x:Name="SectionTabs" Background="Transparent">
+        <TabControl.Styles>
+            <Style Selector="TabControl /template/ ItemsPresenter#PART_ItemsPresenter">
+                <Setter Property="IsVisible" Value="False" />
+            </Style>
+        </TabControl.Styles>
         <TabItem Header="Pokémon">
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid RowDefinitions="*,Auto">
             <!-- Area box in stile Pokémon HOME -->
-            <Border Grid.Column="0" CornerRadius="12" Margin="8" Padding="16">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                        <GradientStop Color="#20325C" Offset="0" />
-                        <GradientStop Color="#0D1930" Offset="1" />
-                    </LinearGradientBrush>
-                </Border.Background>
+            <Border Grid.Row="0" CornerRadius="12" Margin="8" Padding="16"
+                    Background="{StaticResource AppBg}">
                 <DockPanel>
-                    <!-- Header: ◀ nome box ▶ -->
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,14">
-                        <Button Grid.Column="0" Content="◀" Command="{Binding PrevBoxCommand}"
-                                FontSize="16" Width="40" Foreground="#CFE6FF" Background="#22FFFFFF" />
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding BoxNames}"
-                                  SelectedIndex="{Binding SelectedBoxIndex}"
-                                  HorizontalAlignment="Center" MinWidth="200"
-                                  HorizontalContentAlignment="Center"
-                                  Background="#18FFFFFF" Foreground="#EAF3FF" FontWeight="SemiBold" />
-                        <Button Grid.Column="2" Content="▶" Command="{Binding NextBoxCommand}"
-                                FontSize="16" Width="40" Foreground="#CFE6FF" Background="#22FFFFFF" />
-                    </Grid>
-
                     <!-- Griglia 6 colonne di celle quadrate -->
                     <ScrollViewer>
                         <ListBox ItemsSource="{Binding CurrentBox}" SelectedItem="{Binding SelectedSlot}"
                                  Background="Transparent" BorderThickness="0" HorizontalAlignment="Center">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="6" />
+                                    <WrapPanel HorizontalAlignment="Center" />
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="3" />
-                                    <Setter Property="CornerRadius" Value="12" />
+                                    <Setter Property="Margin" Value="0" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="ClipToBounds" Value="False" />
                                 </Style>
+                                <!-- niente riquadro/alone su hover o selezione -->
                                 <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="#18FFFFFF" />
+                                    <Setter Property="Background" Value="Transparent" />
                                 </Style>
                                 <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="#4038D0DC" />
-                                    <Setter Property="BorderBrush" Value="#38D0DC" />
-                                    <Setter Property="BorderThickness" Value="2" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                                <!-- lo sprite si ingrandisce al passaggio del mouse -->
+                                <Style Selector="Image.sprite">
+                                    <Setter Property="RenderTransformOrigin" Value="50%,60%" />
+                                    <!-- il contenuto degli sprite è ancorato in basso: alzalo per centrarlo nella cella -->
+                                    <Setter Property="RenderTransform" Value="translateY(-42px)" />
+                                    <Setter Property="Transitions">
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+                                        </Transitions>
+                                    </Setter>
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover Image.sprite">
+                                    <Setter Property="RenderTransform" Value="translateY(-42px) scale(1.30)" />
+                                </Style>
+                                <!-- selezionato: ingrandito + saltellino continuo (via Margin, che ha un animator) -->
+                                <Style Selector="ListBoxItem:selected Image.sprite">
+                                    <Setter Property="RenderTransform" Value="translateY(-42px) scale(1.16)" />
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:0.7" IterationCount="INFINITE" Easing="SineEaseInOut">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Margin" Value="0,0,0,0" />
+                                            </KeyFrame>
+                                            <KeyFrame Cue="50%">
+                                                <Setter Property="Margin" Value="0,-7,0,0" />
+                                            </KeyFrame>
+                                            <KeyFrame Cue="100%">
+                                                <Setter Property="Margin" Value="0,0,0,0" />
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                                <!-- etichetta nome: nascosta, appare su hover o selezione -->
+                                <Style Selector="StackPanel.nameoverlay">
+                                    <Setter Property="IsVisible" Value="False" />
+                                </Style>
+                                <Style Selector="ListBoxItem:pointerover StackPanel.nameoverlay">
+                                    <Setter Property="IsVisible" Value="True" />
                                 </Style>
                             </ListBox.Styles>
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:SlotViewModel">
-                                    <Border Width="78" Height="78" CornerRadius="12"
-                                            Background="#12FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1"
-                                            ToolTip.Tip="{Binding Tooltip}">
-                                        <Panel>
-                                            <Image Source="{Binding Sprite}" Width="66" Height="58"
-                                                   Stretch="Uniform"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <TextBlock Text="★" Foreground="#FFE066" FontSize="14"
-                                                       HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                       Margin="0,2,4,0" IsVisible="{Binding IsShiny}" />
-                                            <TextBlock Text="🥚" FontSize="12"
-                                                       HorizontalAlignment="Left" VerticalAlignment="Top"
-                                                       Margin="4,2,0,0" IsVisible="{Binding IsEggSlot}" />
-                                        </Panel>
-                                    </Border>
+                                    <Panel Width="200" Height="176" Background="Transparent" ClipToBounds="False">
+                                        <!-- ombra fittizia / base slot: cerchietto scuro sfumato (visibile anche se vuoto) -->
+                                        <Ellipse Width="90" Height="90" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                 Margin="0,14,0,0" Fill="{StaticResource SlotShadow}" />
+                                        <Image Source="{Binding Sprite}" Width="196" Height="168"
+                                               Classes="sprite" Stretch="Uniform"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <TextBlock Text="★" Foreground="#F4B400" FontSize="15"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                   Margin="0,4,6,0" IsVisible="{Binding IsShiny}" />
+                                        <TextBlock Text="🥚" FontSize="13"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                   Margin="6,4,0,0" IsVisible="{Binding IsEggSlot}" />
+                                        <!-- Etichetta nome in layout (segue il Pokémon anche al resize) -->
+                                        <StackPanel Classes="nameoverlay" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                    Spacing="0" Margin="0,-56,0,0" ZIndex="20" IsHitTestVisible="False">
+                                            <Border Background="#E62A2A2A" CornerRadius="6" Padding="10,4"
+                                                    BorderBrush="#E23B3B" BorderThickness="0,0,0,3">
+                                                <TextBlock Text="{Binding NameLevel}" Foreground="White" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Polygon Points="0,0 16,0 8,9" Fill="#E23B3B" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </Panel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -106,7 +334,7 @@
             </Border>
 
             <!-- Slot vuoto: crea un nuovo Pokémon -->
-            <Border Grid.Column="1" Width="330" Padding="12"
+            <Border Grid.Row="1" Padding="12"
                     Background="#22808080"
                     IsVisible="{Binding IsEmptySlotSelected}">
                 <StackPanel VerticalAlignment="Center" Spacing="12">
@@ -121,18 +349,28 @@
                 </StackPanel>
             </Border>
 
-            <!-- Editor panel -->
-            <Border Grid.Column="1" Width="330" Padding="12"
+            <!-- Editor panel (in basso) -->
+            <Border Grid.Row="1" MaxHeight="360" Padding="12"
                     Background="#22808080"
                     IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <ScrollViewer>
                     <StackPanel DataContext="{Binding Editor}" Spacing="6"
                                 x:DataType="vm:PokemonEditorViewModel">
-                        <TextBlock Text="{Binding Header}" FontWeight="Bold" FontSize="16" />
-
-                        <Border CornerRadius="4" Padding="8,5" Margin="0,4,0,0" Background="#18808080">
+                        <Border CornerRadius="4" Padding="8,5" Background="#18808080">
                             <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding LegalityText}" FontWeight="SemiBold" />
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding LegalityText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Markings}" IsVisible="{Binding HasMarkings}" VerticalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:MarkingViewModel">
+                                                <ToggleButton Classes="mark" IsChecked="{Binding IsSet}" Content="{Binding Symbol}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
                                 <Expander IsVisible="{Binding HasLegalityReport}" Padding="0">
                                     <Expander.Header><TextBlock Text="Dettagli legalità" FontSize="12" /></Expander.Header>
                                     <TextBlock Text="{Binding LegalityReport}" TextWrapping="Wrap" FontSize="12" Opacity="0.85" />
@@ -140,69 +378,157 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="Soprannome" Margin="0,6,0,0" Opacity="0.7" />
-                        <TextBox Text="{Binding NicknameText}" MaxLength="10"
-                                 PlaceholderText="(vuoto = nome della specie)" />
-
-                        <TextBlock Text="Simboli" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding HasMarkings}" />
-                        <ItemsControl ItemsSource="{Binding Markings}" IsVisible="{Binding HasMarkings}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="4" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MarkingViewModel">
-                                    <ToggleButton IsChecked="{Binding IsSet}" Content="{Binding Symbol}"
-                                                  FontSize="16" Width="42" Padding="0"
-                                                  HorizontalContentAlignment="Center" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <TextBlock Text="Specie" Margin="0,6,0,0" Opacity="0.7" />
-                        <ComboBox ItemsSource="{Binding SpeciesNames}"
-                                  SelectedIndex="{Binding Species}" HorizontalAlignment="Stretch" />
-
-                        <TextBlock Text="Genere" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding CanEditGender}" />
-                        <ComboBox ItemsSource="{Binding GenderNames}" SelectedIndex="{Binding GenderIndex}"
-                                  HorizontalAlignment="Stretch" IsVisible="{Binding CanEditGender}" />
-
-                        <TextBlock Text="Livello" Margin="0,6,0,0" Opacity="0.7" />
-                        <NumericUpDown Value="{Binding Level}" Minimum="1" Maximum="100"
-                                       Increment="1" FormatString="0" />
-
-                        <TextBlock Text="Natura" Margin="0,6,0,0" Opacity="0.7" />
-                        <ComboBox ItemsSource="{Binding NatureNames}"
-                                  SelectedIndex="{Binding NatureIndex}" HorizontalAlignment="Stretch" />
+                        <!-- Riga identità: [shiny·nome·genere·LV] · Natura (centro) · Specie (destra) -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,0" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <CheckBox Content="✨" IsChecked="{Binding IsShiny}" ToolTip.Tip="Shiny (cromatico)" VerticalAlignment="Center" />
+                                <TextBox Classes="inline" Text="{Binding NicknameText}" MaxLength="10"
+                                         FontWeight="Bold" FontSize="16" VerticalAlignment="Center" MinWidth="70"
+                                         ToolTip.Tip="Soprannome (clic per modificare)" />
+                                <Button Classes="genderbtn" Content="{Binding GenderSymbol}" Command="{Binding ToggleGenderCommand}"
+                                        FontSize="16" FontWeight="Bold" VerticalAlignment="Center"
+                                        ToolTip.Tip="Genere (clic per cambiare)" />
+                                <TextBlock Text="LV." VerticalAlignment="Center" Opacity="0.7" Margin="6,0,0,0" />
+                                <TextBox Classes="inline" Text="{Binding Level}" FontWeight="Bold" FontSize="16"
+                                         VerticalAlignment="Center" Width="40" ToolTip.Tip="Livello (clic per modificare)" />
+                                <!-- Natura di fianco al livello, in grassetto -->
+                                <ComboBox Classes="borderless" ItemsSource="{Binding NatureNames}" SelectedIndex="{Binding NatureIndex}"
+                                          FontWeight="Bold" VerticalAlignment="Center" Margin="6,0,0,0" ToolTip.Tip="Natura" />
+                                <ComboBox Classes="borderless" ItemsSource="{Binding ItemNames}" SelectedIndex="{Binding HeldItemIndex}"
+                                          VerticalAlignment="Center" ToolTip.Tip="Strumento tenuto" />
+                            </StackPanel>
+                            <!-- Specie a destra (senza box) -->
+                            <ComboBox Grid.Column="2" Classes="borderless" ItemsSource="{Binding SpeciesNames}" SelectedIndex="{Binding Species}"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" Width="150" ToolTip.Tip="Specie" />
+                        </Grid>
 
                         <TextBlock Text="Forma" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding HasForms}" />
                         <ComboBox ItemsSource="{Binding FormNames}" SelectedIndex="{Binding FormIndex}"
                                   HorizontalAlignment="Stretch" IsVisible="{Binding HasForms}" />
 
-                        <TextBlock Text="Strumento tenuto" Margin="0,6,0,0" Opacity="0.7" />
-                        <ComboBox ItemsSource="{Binding ItemNames}" SelectedIndex="{Binding HeldItemIndex}"
-                                  HorizontalAlignment="Stretch" />
+                        <TextBlock Text="Mosse (PP disp / reali + PP Up)" Margin="0,6,0,0" Opacity="0.7" />
+                        <Border Classes="card">
+                            <ItemsControl ItemsSource="{Binding Moves}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MoveSlotViewModel">
+                                        <Grid ColumnDefinitions="108,26,30,14,18" ColumnSpacing="1" Margin="0,3,22,3">
+                                            <ComboBox Grid.Column="0" Classes="borderless" ItemsSource="{Binding MoveNames}" SelectedIndex="{Binding MoveIndex}"
+                                                      FontWeight="SemiBold" VerticalAlignment="Center" ToolTip.Tip="Mossa" />
+                                            <TextBox Grid.Column="1" Classes="inline" Text="{Binding Pp}" TextAlignment="Right"
+                                                     FontWeight="SemiBold" VerticalAlignment="Center" ToolTip.Tip="PP disponibili" />
+                                            <TextBlock Grid.Column="2" Text="{Binding MaxPp, StringFormat='/{0}'}" Opacity="0.7" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="3" Text="+" Opacity="0.5" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                            <TextBox Grid.Column="4" Classes="inline" Text="{Binding PpUps}" TextAlignment="Center"
+                                                     Opacity="0.85" VerticalAlignment="Center" ToolTip.Tip="PP Up (0-3)" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
 
-                        <TextBlock Text="Mosse (PP / max · PP Up)" Margin="0,6,0,0" Opacity="0.7" />
-                        <ItemsControl ItemsSource="{Binding Moves}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MoveSlotViewModel">
-                                    <Grid ColumnDefinitions="*,54,Auto,44" ColumnSpacing="4" Margin="0,1">
-                                        <ComboBox Grid.Column="0" ItemsSource="{Binding MoveNames}"
-                                                  SelectedIndex="{Binding MoveIndex}" HorizontalAlignment="Stretch" />
-                                        <NumericUpDown Grid.Column="1" Value="{Binding Pp}" Minimum="0"
-                                                       Maximum="{Binding MaxPp}" FormatString="0" MinWidth="0"
-                                                       ButtonSpinnerLocation="Left" ToolTip.Tip="PP attuali" />
-                                        <TextBlock Grid.Column="2" Text="{Binding MaxPp, StringFormat='/ {0}'}"
-                                                   VerticalAlignment="Center" Opacity="0.7" />
-                                        <NumericUpDown Grid.Column="3" Value="{Binding PpUps}" Minimum="0" Maximum="3"
-                                                       FormatString="0" MinWidth="0" ShowButtonSpinner="False"
-                                                       ToolTip.Tip="PP Up (0–3)" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <!-- Statistiche (IV/EV) — subito dopo le mosse -->
+                        <TextBlock Text="Statistiche (IV / EV)" Margin="0,6,0,0" Opacity="0.7" />
+                        <Border Classes="card">
+                        <UniformGrid Columns="3">
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="HP" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvHp}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvHp}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="Atk" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvAtk}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvAtk}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="Def" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvDef}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvDef}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="SpA" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvSpa}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvSpa}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="SpD" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvSpd}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvSpd}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
+                                <TextBlock Text="Spe" VerticalAlignment="Center" FontWeight="Bold" />
+                                <TextBox Grid.Column="1" Classes="inline" Text="{Binding IvSpe}" TextAlignment="Right" ToolTip.Tip="IV (0-31)" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding EvSpe}" TextAlignment="Right" Opacity="0.75" ToolTip.Tip="EV (0-255)" />
+                            </Grid>
+                        </UniformGrid>
+                        </Border>
+
+                        <!-- Gare Pokémon (ex-condizione) + fiocchi delle gare -->
+                        <TextBlock Text="Gare Pokémon (valori 0–255)" Margin="0,6,0,0" Opacity="0.7" IsVisible="{Binding HasContest}" />
+                        <Border Classes="card" IsVisible="{Binding HasContest}">
+                          <StackPanel Spacing="6">
+                            <UniformGrid Columns="3">
+                                <Grid ColumnDefinitions="*,34" ColumnSpacing="4" Margin="0,1,22,1">
+                                    <TextBlock Text="Classe" VerticalAlignment="Center" FontWeight="Bold" />
+                                    <TextBox Grid.Column="1" Classes="inline" Text="{Binding ConCool}" TextAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,34" ColumnSpacing="4" Margin="0,1,22,1">
+                                    <TextBlock Text="Bellezza" VerticalAlignment="Center" FontWeight="Bold" />
+                                    <TextBox Grid.Column="1" Classes="inline" Text="{Binding ConBeauty}" TextAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,34" ColumnSpacing="4" Margin="0,1,22,1">
+                                    <TextBlock Text="Grazia" VerticalAlignment="Center" FontWeight="Bold" />
+                                    <TextBox Grid.Column="1" Classes="inline" Text="{Binding ConCute}" TextAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,34" ColumnSpacing="4" Margin="0,1,22,1">
+                                    <TextBlock Text="Acume" VerticalAlignment="Center" FontWeight="Bold" />
+                                    <TextBox Grid.Column="1" Classes="inline" Text="{Binding ConSmart}" TextAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,34" ColumnSpacing="4" Margin="0,1,22,1">
+                                    <TextBlock Text="Grinta" VerticalAlignment="Center" FontWeight="Bold" />
+                                    <TextBox Grid.Column="1" Classes="inline" Text="{Binding ConTough}" TextAlignment="Right" />
+                                </Grid>
+                            </UniformGrid>
+                            <!-- fiocchi delle gare (rango 0-4), 3x2 -->
+                            <ItemsControl ItemsSource="{Binding ContestRibbons}" IsVisible="{Binding HasContestRibbons}" Margin="0,2,0,0">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RibbonEntryViewModel">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="2" Margin="0,1,20,1">
+                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="Bold"
+                                                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                                        ToolTip.Tip="Rango gara (0-4)">
+                                                <Button Classes="stepper" Content="−" Command="{Binding DecrementCommand}" />
+                                                <TextBlock Text="{Binding Count}" Width="16" TextAlignment="Center"
+                                                           FontWeight="Bold" VerticalAlignment="Center" />
+                                                <Button Classes="stepper" Content="+" Command="{Binding IncrementCommand}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- Lucentezza (Sheen, Gen3/4/8): stelle cliccabili -->
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,4,0,0" IsVisible="{Binding HasSheen}">
+                                <TextBlock Grid.Column="0" Text="Lucentezza" VerticalAlignment="Center" FontWeight="Bold" Opacity="0.7"
+                                           ToolTip.Tip="Sheen: non è una condizione di gara, limita i Pokéblock" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding SheenStars}" VerticalAlignment="Center">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SheenStarViewModel">
+                                            <Button Classes="star" Command="{Binding ClickCommand}" Content="★"
+                                                    Foreground="{Binding StarBrush}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                          </StackPanel>
+                        </Border>
 
                         <!-- Squadra: HP e stato (solo party) -->
                         <StackPanel Spacing="3" IsVisible="{Binding IsParty}">
@@ -216,89 +542,34 @@
                             </Grid>
                         </StackPanel>
 
-                        <!-- Cattura -->
-                        <TextBlock Text="Cattura" Margin="0,8,0,0" Opacity="0.7" />
-                        <ComboBox ItemsSource="{Binding LocationNames}" SelectedIndex="{Binding MetLocationIndex}"
-                                  HorizontalAlignment="Stretch" ToolTip.Tip="Zona di cattura" />
-                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                            <TextBlock Grid.Column="0" Text="Livello" VerticalAlignment="Center" Opacity="0.7" />
-                            <NumericUpDown Grid.Column="1" Value="{Binding MetLevelValue}" Minimum="0" Maximum="100" FormatString="0" MinWidth="0" />
-                            <TextBlock Grid.Column="2" Text="{Binding MetDateText, StringFormat='Data: {0}'}"
-                                       VerticalAlignment="Center" Opacity="0.6" FontSize="12" IsVisible="{Binding HasMetDate}" />
-                        </Grid>
+                        <!-- Fiocchi (non-gara), compatti su 2 colonne -->
+                        <TextBlock Text="Fiocchi" Margin="0,8,0,0" Opacity="0.7" IsVisible="{Binding HasOtherRibbons}" />
+                        <Border Classes="card" IsVisible="{Binding HasOtherRibbons}">
+                            <ItemsControl ItemsSource="{Binding OtherRibbons}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RibbonEntryViewModel">
+                                        <CheckBox Content="{Binding Label, StringFormat='🎀 {0}'}" IsChecked="{Binding IsSet}"
+                                                  Margin="0,0,8,0" FontSize="12" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
 
-                        <TextBlock Text="Statistiche" Margin="0,6,0,0" Opacity="0.7" />
-                        <Grid ColumnDefinitions="Auto,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
-                              ColumnSpacing="6" RowSpacing="3">
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="IV (0–31)"  FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
-                            <TextBlock Grid.Row="0" Grid.Column="2" Text="EV (0–255)" FontSize="11" Opacity="0.7" HorizontalAlignment="Center" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="HP"  VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding IvHp}"  Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding EvHp}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Atk" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding IvAtk}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="2" Grid.Column="2" Value="{Binding EvAtk}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Def" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding IvDef}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="3" Grid.Column="2" Value="{Binding EvDef}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="SpA" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding IvSpa}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="4" Grid.Column="2" Value="{Binding EvSpa}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="SpD" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding IvSpd}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="5" Grid.Column="2" Value="{Binding EvSpd}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Spe" VerticalAlignment="Center" />
-                            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding IvSpe}" Minimum="0" Maximum="31"  FormatString="0" MinWidth="0" />
-                            <NumericUpDown Grid.Row="6" Grid.Column="2" Value="{Binding EvSpe}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-                        </Grid>
-
-                        <!-- Condizione (contest) -->
-                        <StackPanel IsVisible="{Binding HasContest}" Spacing="3">
-                            <TextBlock Text="Condizione (0–255)" Margin="0,8,0,0" Opacity="0.7" />
-                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6" RowSpacing="3">
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Cool"     VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding ConCool}"   Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Bellezza" VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="0" Grid.Column="3" Value="{Binding ConBeauty}" Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Grazia"   VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding ConCute}"   Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Acume"    VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="1" Grid.Column="3" Value="{Binding ConSmart}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Grinta"   VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding ConTough}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
-                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Fascino"  VerticalAlignment="Center" />
-                                <NumericUpDown Grid.Row="2" Grid.Column="3" Value="{Binding ConSheen}"  Minimum="0" Maximum="255" FormatString="0" MinWidth="0" />
+                        <!-- Cattura: percorso + livello a destra (poco sopra Applica) -->
+                        <TextBlock Text="Cattura" Margin="0,6,0,0" Opacity="0.7" />
+                        <Border Classes="card">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4" VerticalAlignment="Center">
+                                <ComboBox Grid.Column="0" Classes="borderless" ItemsSource="{Binding LocationNames}"
+                                          SelectedIndex="{Binding MetLocationIndex}" HorizontalAlignment="Left"
+                                          VerticalAlignment="Center" FontWeight="SemiBold" ToolTip.Tip="Zona di cattura" />
+                                <TextBlock Grid.Column="1" Text="LV." VerticalAlignment="Center" Opacity="0.7" Margin="8,0,2,0" />
+                                <TextBox Grid.Column="2" Classes="inline" Text="{Binding MetLevelValue}" Width="34"
+                                         TextAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" ToolTip.Tip="Livello di cattura" />
                             </Grid>
-                        </StackPanel>
-
-                        <!-- Fiocchi (ribbons) -->
-                        <TextBlock Text="Fiocchi" Margin="0,8,0,0" Opacity="0.7" />
-                        <ItemsControl ItemsSource="{Binding Ribbons}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:RibbonEntryViewModel">
-                                    <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                        <CheckBox Grid.Column="0" Content="{Binding Label}"
-                                                  IsChecked="{Binding IsSet}"
-                                                  IsVisible="{Binding IsBoolean}" />
-                                        <TextBlock Grid.Column="0" Text="{Binding Label}"
-                                                   VerticalAlignment="Center"
-                                                   IsVisible="{Binding !IsBoolean}" />
-                                        <NumericUpDown Grid.Column="1" Value="{Binding Count}"
-                                                       Minimum="0" Maximum="{Binding MaxCount}" FormatString="0"
-                                                       MinWidth="0" Width="110"
-                                                       IsVisible="{Binding !IsBoolean}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        </Border>
 
                         <Button Content="✔ Applica" Command="{Binding ApplyCommand}"
                                 HorizontalAlignment="Stretch" Margin="0,10,0,0" />
@@ -423,56 +694,87 @@
             </DockPanel>
         </TabItem>
 
-        <!-- POKEDEX / EVENTI -->
-        <TabItem Header="Pokédex / Eventi">
+        <!-- POKEDEX (griglia sprite stile box) -->
+        <TabItem Header="Pokédex">
+            <Border CornerRadius="12" Margin="8" Padding="16" Background="{StaticResource AppBg}"
+                    DataContext="{Binding Dex}" x:DataType="vm:DexViewModel">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,10">
+                        <TextBlock Foreground="#3A2B5C" FontWeight="SemiBold">
+                            <Run Text="Visti: " /><Run Text="{Binding SeenCount}" />
+                            <Run Text="  ·  Catturati: " /><Run Text="{Binding CaughtCount}" />
+                            <Run Text=" / " /><Run Text="{Binding MaxSpecies}" />
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="pill" Content="Tutti VISTI" Command="{Binding SetAllSeenCommand}" />
+                            <Button Classes="pill" Content="Tutti CATTURATI" Command="{Binding SetAllCaughtCommand}" />
+                            <TextBox Text="{Binding DexSearch}" PlaceholderText="Cerca specie…" MinWidth="200" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="Clicca uno sprite per cambiarne lo stato: non visto (grigio) → visto (scala di grigi) → catturato (colore)"
+                                   FontSize="11" Opacity="0.75" Foreground="#3A2B5C" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding DexEntries}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel HorizontalAlignment="Center" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DexEntryViewModel">
+                                    <Button Classes="dexcell" Command="{Binding CycleCommand}"
+                                            ToolTip.Tip="{Binding Display}" Margin="2">
+                                        <Panel Width="88" Height="80">
+                                            <Ellipse Width="58" Height="58" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                     Margin="0,8,0,0" Fill="{StaticResource SlotShadow}" />
+                                            <Image Source="{Binding Sprite}" Width="80" Height="70" Stretch="Uniform"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Panel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </TabItem>
+
+        <!-- EVENTI -->
+        <TabItem Header="Eventi">
             <ScrollViewer>
                 <StackPanel DataContext="{Binding Dex}" x:DataType="vm:DexViewModel"
-                            Spacing="6" Margin="16" MaxWidth="640" HorizontalAlignment="Left">
-                    <TextBlock Text="Pokédex" FontWeight="Bold" FontSize="16" />
-                    <TextBlock>
-                        <Run Text="Visti: " /><Run Text="{Binding SeenCount}" />
-                        <Run Text="   ·   Catturati: " /><Run Text="{Binding CaughtCount}" />
-                        <Run Text=" / " /><Run Text="{Binding MaxSpecies}" />
+                            Spacing="6" Margin="16" MaxWidth="640" HorizontalAlignment="Left"
+                            IsVisible="{Binding HasEventFlags}">
+                    <TextBlock Text="Eventi" FontWeight="Bold" FontSize="16" />
+
+                    <!-- Flag nominati (dati di ricerca PKHeX) -->
+                    <StackPanel Spacing="4" IsVisible="{Binding HasNamedFlags}">
+                        <TextBlock Text="Flag noti — spunta per attivare/disattivare (medaglie, MN, leggendari, doni…)"
+                                   Opacity="0.7" TextWrapping="Wrap" />
+                        <TextBox Text="{Binding FlagSearch}" PlaceholderText="Cerca… (es. Badge, HM, Groudon)" />
+                        <Border BorderBrush="#40808080" BorderThickness="1" CornerRadius="4">
+                            <ScrollViewer Height="380">
+                                <ItemsControl ItemsSource="{Binding NamedFlags}" Margin="6">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:NamedFlagViewModel">
+                                            <CheckBox IsChecked="{Binding IsSet}" Content="{Binding Display}" Margin="0,1" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Per numero (avanzato) -->
+                    <TextBlock Text="Per numero (avanzato)" FontWeight="SemiBold" Margin="0,10,0,0" />
+                    <TextBlock Opacity="0.6" FontSize="12">
+                        <Run Text="Totale flag: " /><Run Text="{Binding EventFlagCount}" />
                     </TextBlock>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Segna tutti VISTI" Command="{Binding SetAllSeenCommand}" />
-                        <Button Content="Segna tutti CATTURATI" Command="{Binding SetAllCaughtCommand}" />
-                    </StackPanel>
-
-                    <Border Height="1" Background="#40808080" Margin="0,12" IsVisible="{Binding HasEventFlags}" />
-
-                    <StackPanel Spacing="6" IsVisible="{Binding HasEventFlags}">
-                        <TextBlock Text="Eventi" FontWeight="Bold" FontSize="16" />
-
-                        <!-- Flag nominati (dati di ricerca PKHeX) -->
-                        <StackPanel Spacing="4" IsVisible="{Binding HasNamedFlags}">
-                            <TextBlock Text="Flag noti — spunta per attivare/disattivare (medaglie, MN, leggendari, doni…)"
-                                       Opacity="0.7" TextWrapping="Wrap" />
-                            <TextBox Text="{Binding FlagSearch}" PlaceholderText="Cerca… (es. Badge, HM, Groudon)" />
-                            <Border BorderBrush="#40808080" BorderThickness="1" CornerRadius="4">
-                                <ScrollViewer Height="300">
-                                    <ItemsControl ItemsSource="{Binding NamedFlags}" Margin="6">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:NamedFlagViewModel">
-                                                <CheckBox IsChecked="{Binding IsSet}" Content="{Binding Display}" Margin="0,1" />
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Per numero (avanzato) -->
-                        <TextBlock Text="Per numero (avanzato)" FontWeight="SemiBold" Margin="0,10,0,0" />
-                        <TextBlock Opacity="0.6" FontSize="12">
-                            <Run Text="Totale flag: " /><Run Text="{Binding EventFlagCount}" />
-                        </TextBlock>
-                        <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
-                            <NumericUpDown Grid.Column="0" Value="{Binding FlagNumber}" Minimum="0" Maximum="9999" FormatString="0" MinWidth="0" Width="140" />
-                            <CheckBox Grid.Column="1" Content="Attivo" IsChecked="{Binding FlagValue}" VerticalAlignment="Center" />
-                            <Button Grid.Column="2" Content="✔ Applica flag" Command="{Binding ApplyFlagCommand}" />
-                        </Grid>
-                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="8">
+                        <NumericUpDown Grid.Column="0" Value="{Binding FlagNumber}" Minimum="0" Maximum="9999" FormatString="0" MinWidth="0" Width="140" />
+                        <CheckBox Grid.Column="1" Content="Attivo" IsChecked="{Binding FlagValue}" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Content="✔ Applica flag" Command="{Binding ApplyFlagCommand}" />
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </TabItem>
