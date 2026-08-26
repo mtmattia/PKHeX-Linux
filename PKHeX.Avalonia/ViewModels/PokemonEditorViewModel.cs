@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Text;
+using System.Threading.Tasks;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +22,7 @@ public partial class PokemonEditorViewModel : ViewModelBase
     private readonly int _slot;
     private readonly bool _isParty;
     private readonly Action _onApplied;
+    private readonly Action<string>? _onStatus;
 
     // Choice lists for the combo boxes (index == in-game id).
     public IReadOnlyList<string> SpeciesNames { get; } = GameInfo.Strings.Species;
@@ -49,6 +52,11 @@ public partial class PokemonEditorViewModel : ViewModelBase
 
     [ObservableProperty] public partial int HeldItemIndex { get; set; }
 
+    // Ability: the species' selectable abilities (name list) + chosen slot.
+    public IReadOnlyList<string> AbilityOptions { get; }
+    public bool HasAbilityChoice => AbilityOptions.Count > 1;
+    [ObservableProperty] public partial int AbilityIndex { get; set; }
+
     public ObservableCollection<MoveSlotViewModel> Moves { get; } = new();
 
     [ObservableProperty] public partial int IvHp { get; set; }
@@ -63,6 +71,25 @@ public partial class PokemonEditorViewModel : ViewModelBase
     [ObservableProperty] public partial int EvSpa { get; set; }
     [ObservableProperty] public partial int EvSpd { get; set; }
     [ObservableProperty] public partial int EvSpe { get; set; }
+
+    /// <summary>Total EVs spent and how many remain of the 510 cap.</summary>
+    public int EvTotal => EvHp + EvAtk + EvDef + EvSpa + EvSpd + EvSpe;
+    public int EvRemaining => 510 - EvTotal;
+    public string EvSummary => $"EV: {EvTotal}/510 · rimanenti {Math.Max(0, EvRemaining)}";
+
+    partial void OnEvHpChanged(int value) => NotifyEvTotals();
+    partial void OnEvAtkChanged(int value) => NotifyEvTotals();
+    partial void OnEvDefChanged(int value) => NotifyEvTotals();
+    partial void OnEvSpaChanged(int value) => NotifyEvTotals();
+    partial void OnEvSpdChanged(int value) => NotifyEvTotals();
+    partial void OnEvSpeChanged(int value) => NotifyEvTotals();
+
+    private void NotifyEvTotals()
+    {
+        OnPropertyChanged(nameof(EvTotal));
+        OnPropertyChanged(nameof(EvRemaining));
+        OnPropertyChanged(nameof(EvSummary));
+    }
 
     [ObservableProperty] public partial bool IsShiny { get; set; }
 
@@ -163,7 +190,12 @@ public partial class PokemonEditorViewModel : ViewModelBase
     public string LegalityReport { get; private set; } = "";
     public bool HasLegalityReport => LegalityReport.Length != 0;
 
-    public PokemonEditorViewModel(SaveFile sav, PKM pk, int box, int slot, bool isParty, Action onApplied)
+    // Friendly per-move hints: names the illegal moves; for a level-up move whose learn
+    // level is above the current level, tells the minimum level required.
+    public string MoveHints { get; private set; } = "";
+    public bool HasMoveHints => MoveHints.Length != 0;
+
+    public PokemonEditorViewModel(SaveFile sav, PKM pk, int box, int slot, bool isParty, Action onApplied, Action<string>? onStatus = null)
     {
         _sav = sav;
         _pk = pk;
@@ -171,6 +203,7 @@ public partial class PokemonEditorViewModel : ViewModelBase
         _slot = slot;
         _isParty = isParty;
         _onApplied = onApplied;
+        _onStatus = onStatus;
 
         var str = GameInfo.Strings;
         ItemNames = str.GetItemStrings(pk.Context, pk.Version);
@@ -184,6 +217,10 @@ public partial class PokemonEditorViewModel : ViewModelBase
         GenderIndex = pk.Gender == 1 ? 1 : 0;
 
         HeldItemIndex = pk.HeldItem;
+
+        AbilityOptions = BuildAbilityOptions(pk, str);
+        int abilN = pk.AbilityNumber switch { 4 => 2, 2 => 1, _ => 0 };
+        AbilityIndex = Math.Clamp(abilN, 0, Math.Max(0, AbilityOptions.Count - 1));
 
         Moves.Add(new MoveSlotViewModel(MoveNames, pk.Move1, pk.Move1_PP, pk.Move1_PPUps, pk.GetMovePP));
         Moves.Add(new MoveSlotViewModel(MoveNames, pk.Move2, pk.Move2_PP, pk.Move2_PPUps, pk.GetMovePP));
@@ -240,96 +277,384 @@ public partial class PokemonEditorViewModel : ViewModelBase
             (r.IsBoolean ? OtherRibbons : ContestRibbons).Add(r); // count-based = contest ranks
         }
 
+        // Live legality: re-evaluate whenever any child field (moves/ribbons/markings) changes.
+        foreach (var m in Moves) m.PropertyChanged += OnChildChanged;
+        foreach (var r in Ribbons) r.PropertyChanged += OnChildChanged;
+        foreach (var mk in Markings) mk.PropertyChanged += OnChildChanged;
+
+        _loaded = true;
         RefreshLegality();
+    }
+
+    private readonly bool _loaded;
+    // Re-entrancy guard: RefreshLegality raises property changes (LegalityText, MoveHints, …)
+    // which flow back through OnPropertyChanged — without this it would recurse infinitely.
+    private bool _inLegalityRefresh;
+
+    // These properties don't affect legality — skip the (harmless) re-evaluation on them.
+    private static readonly System.Collections.Generic.HashSet<string> LegalityIgnored = new()
+    {
+        nameof(LegalityValid), nameof(LegalityText), nameof(LegalityReport), nameof(HasLegalityReport),
+        nameof(CanFixLegality), nameof(CanFixPid), nameof(MoveHints), nameof(HasMoveHints),
+        nameof(GenderSymbol), nameof(ShowdownText), nameof(EvTotal), nameof(EvRemaining), nameof(EvSummary),
+        nameof(SheenSparkles), nameof(HpMax),
+    };
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && !_inLegalityRefresh && e.PropertyName is { } name && !LegalityIgnored.Contains(name))
+            RefreshLegality();
+    }
+
+    private void OnChildChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (_loaded && !_inLegalityRefresh)
+            RefreshLegality();
     }
 
     private void RefreshLegality()
     {
+        if (_inLegalityRefresh)
+            return;
+        _inLegalityRefresh = true;
         try
         {
-            var la = new LegalityAnalysis(_pk);
+            // Evaluate what the entity WOULD be with the current (unapplied) edits, so the
+            // indicator reflects the pending changes before the user presses Applica.
+            var probe = _pk.Clone();
+            WriteTo(probe);
+            probe.RefreshChecksum();
+            var la = new LegalityAnalysis(probe);
             LegalityValid = la.Valid;
             LegalityText = la.Valid ? "✅ Legale" : "⚠️ Potenzialmente illegale";
-            var report = la.Report();
-            LegalityReport = la.Valid ? "" : report;
+            LegalityReport = la.Valid ? "" : la.Report();
+            MoveHints = la.Valid ? "" : BuildMoveHints(probe, la);
         }
         catch (Exception ex)
         {
             LegalityValid = false;
             LegalityText = "⚠️ Legalità non determinabile";
             LegalityReport = ex.Message;
+            MoveHints = "";
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(LegalityValid));
+            OnPropertyChanged(nameof(LegalityText));
+            OnPropertyChanged(nameof(LegalityReport));
+            OnPropertyChanged(nameof(HasLegalityReport));
+            OnPropertyChanged(nameof(CanFixLegality));
+            OnPropertyChanged(nameof(CanFixPid));
+            OnPropertyChanged(nameof(MoveHints));
+            OnPropertyChanged(nameof(HasMoveHints));
+            _inLegalityRefresh = false;
         }
     }
 
     [RelayCommand]
     private void Apply()
     {
-        // Species must be set before Level: CurrentLevel uses the species' growth rate.
-        _pk.Species = (ushort)Species;
+        WriteTo(_pk);
+        Persist();
+        _onApplied();
+    }
 
-        // Nature + gender: in Gen3–5 both derive from the PID, so reroll a single PID
-        // matching both (keeping the ability bit); Gen6+ store them independently.
+    /// <summary>True when the current (pending) edits are not legal — enables the Fix button.</summary>
+    public bool CanFixLegality => !LegalityValid;
+
+    /// <summary>Best-effort legalization of the common fixables (moves+PP, met level/location,
+    /// EV cap, party stats). It first applies the pending UI edits, then repairs. Routes through
+    /// the normal apply pipeline, so it is captured by Undo and refreshes the editor.</summary>
+    [RelayCommand]
+    private void FixLegality()
+    {
+        WriteTo(_pk);
+        TryLegalize(_pk);
+        Persist();
+        _onApplied();
+    }
+
+    /// <summary>Enabled for Gen3 illegal entities: fix the PID/IV correlation for the chosen nature.</summary>
+    public bool CanFixPid => !LegalityValid && _pk.Format is 3;
+
+    /// <summary>
+    /// Makes the PID legal for the chosen nature.
+    /// • Bred/egg entities (no PID/IV correlation in Gen3): just assign a PID for the nature and
+    ///   keep the user's IVs — full freedom on nature AND IVs.
+    /// • Wild/static (Method-1 correlation): frame-search a seed whose PID gives the nature and
+    ///   whose derived IVs keep the entity legal (IVs are dictated by the frame).
+    /// Also fixes the non-PID issues (moves/met/EV) first so the result is fully legal.
+    /// </summary>
+    [RelayCommand]
+    private async Task FixPid()
+    {
+        WriteTo(_pk);
+        TryLegalize(_pk); // moves/met/EV so only the PID/IV correlation remains
         var nature = (Nature)NatureIndex;
-        byte gender = CanEditGender ? (byte)GenderIndex : _pk.Gender;
-        if (_pk.Format is 3 or 4 or 5)
+
+        // Free case: bred/egg → any PID legal, keep the chosen IVs.
+        if (_pk.WasEgg || _pk.IsEgg)
         {
-            _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, gender, _pk.Version, nature, _pk.Form, _pk.PID);
+            _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, (byte)_pk.Gender, _pk.Version, nature, _pk.Form, _pk.PID);
+            if (IsShiny) _pk.SetShiny();
+            else while (_pk.IsShiny) _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, (byte)_pk.Gender, _pk.Version, nature, _pk.Form, _pk.PID);
+            _pk.RefreshChecksum();
+            Persist();
+            _onApplied();
+            _onStatus?.Invoke($"PID legale impostato per natura {NatureNames[(int)nature]} (uovo: IV liberi).");
+            return;
+        }
+
+        // Correlated case: search a Method-1 frame off the UI thread (LegalityAnalysis is heavy).
+        bool wantShiny = IsShiny;
+        var probe = _pk.Clone();
+        var found = await Task.Run(() => FrameSearchMethod1(probe, nature, wantShiny));
+        if (found is { } r)
+        {
+            _pk.PID = r.Pid;
+            _pk.IV_HP = r.HP; _pk.IV_ATK = r.ATK; _pk.IV_DEF = r.DEF;
+            _pk.IV_SPA = r.SPA; _pk.IV_SPD = r.SPD; _pk.IV_SPE = r.SPE;
+            _pk.RefreshChecksum();
+            Persist();
+            _onApplied();
+            _onStatus?.Invoke($"PID legale trovato per natura {NatureNames[(int)nature]} · IV {r.HP}/{r.ATK}/{r.DEF}/{r.SPA}/{r.SPD}/{r.SPE} (dettati dal frame).");
         }
         else
         {
-            _pk.Nature = nature;
-            _pk.Gender = gender;
+            _onStatus?.Invoke(wantShiny
+                ? "Nessun frame legale trovato (shiny + natura). Per shiny+IV liberi crea un uovo."
+                : "Nessun frame legale trovato per questo incontro. Per natura+IV liberi crea un uovo.");
         }
+    }
 
-        // Shiny: SetShiny rerolls a shiny PID keeping nature/gender; for non-shiny the
-        // reroll above is already non-shiny (guard the rare chance it landed shiny).
-        if (IsShiny)
+    private readonly record struct PidFrame(uint Pid, int HP, int ATK, int DEF, int SPA, int SPD, int SPE);
+
+    // Search random Method-1 frames: PID (2 rand16) then IVs (2 rand16). Accept the first that
+    // matches the target nature (and shiny request) AND passes full legality on the probe.
+    private static PidFrame? FrameSearchMethod1(PKM pk, Nature nature, bool wantShiny)
+    {
+        var rng = new Random();
+        uint tid = pk.TID16, sid = pk.SID16;
+        int natureMatchesTried = 0;
+        for (int i = 0; i < 4_000_000; i++)
         {
-            _pk.SetShiny();
+            uint seed = ((uint)rng.Next(0, 1 << 16) << 16) | (uint)rng.Next(0, 1 << 16);
+            uint s = seed;
+            uint pid = ClassicEraRNG.GetSequentialPID(ref s);
+            if (pid % 25 != (uint)nature)
+                continue;
+            if (wantShiny && ((pid ^ (pid >> 16) ^ tid ^ sid) & 0xFFF8) != 0)
+                continue; // require shiny if asked (rare)
+
+            uint iv1 = LCRNG.Next16(ref s), iv2 = LCRNG.Next16(ref s);
+            pk.PID = pid;
+            pk.IV_HP = (int)(iv1 & 31); pk.IV_ATK = (int)((iv1 >> 5) & 31); pk.IV_DEF = (int)((iv1 >> 10) & 31);
+            pk.IV_SPE = (int)(iv2 & 31); pk.IV_SPA = (int)((iv2 >> 5) & 31); pk.IV_SPD = (int)((iv2 >> 10) & 31);
+            pk.RefreshChecksum();
+            if (new LegalityAnalysis(pk).Valid)
+                return new PidFrame(pid, pk.IV_HP, pk.IV_ATK, pk.IV_DEF, pk.IV_SPA, pk.IV_SPD, pk.IV_SPE);
+
+            if (++natureMatchesTried >= 40_000)
+                break; // bound the number of heavy legality checks
+        }
+        return null;
+    }
+
+    private static void TryLegalize(PKM pk)
+    {
+        // 1. EV cap: scale the six EVs down proportionally if the total exceeds 510.
+        ClampEvTotal(pk);
+
+        // 2. Met level/location: use PKHeX's encounter suggestion (safe, undoable).
+        try
+        {
+            var info = EncounterSuggestion.GetSuggestedMetInfo(pk);
+            if (info is not null && info.Location != 0)
+            {
+                pk.MetLocation = info.Location;
+                pk.MetLevel = info.GetSuggestedMetLevel(pk);
+            }
+        }
+        catch { /* leave met as-is if no suggestion */ }
+
+        // 3. Moves: replace ONLY the illegal slots with legal suggestions, keeping the
+        //    moves that are already valid. Then restore full PP.
+        try
+        {
+            var la = new LegalityAnalysis(pk);
+            var results = la.Info.Moves; // per-slot validity (index 0..3)
+            Span<ushort> suggested = stackalloc ushort[4];
+            la.GetSuggestedCurrentMoves(suggested);
+
+            Span<ushort> cur = [pk.Move1, pk.Move2, pk.Move3, pk.Move4];
+            Span<ushort> final = stackalloc ushort[4];
+
+            // Which current moves we keep (valid and non-empty).
+            for (int i = 0; i < 4; i++)
+                final[i] = (i < results.Length && results[i].Valid) ? cur[i] : (ushort)0;
+
+            // Fill the emptied (illegal) slots with suggested moves not already present.
+            int pick = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                if (i < results.Length && results[i].Valid)
+                    continue; // kept
+                while (pick < 4)
+                {
+                    ushort cand = suggested[pick++];
+                    if (cand != 0 && !Contains(final, cand))
+                    {
+                        final[i] = cand;
+                        break;
+                    }
+                }
+            }
+
+            if (final[0] != 0 || final[1] != 0 || final[2] != 0 || final[3] != 0)
+                pk.SetMoves(final); // also sets max current PP
+            pk.HealPP();
+        }
+        catch { /* keep existing moves if suggestion fails */ }
+
+        // 4. Recompute stored stats for party members.
+        pk.RefreshChecksum();
+    }
+
+    // Names each illegal move; for a level-up move learned above the current level,
+    // states the minimum level required ("serve almeno il livello N").
+    private string BuildMoveHints(PKM pk, LegalityAnalysis la)
+    {
+        var results = la.Info.Moves;
+        Span<ushort> mv = [pk.Move1, pk.Move2, pk.Move3, pk.Move4];
+        var sb = new StringBuilder();
+        for (int i = 0; i < 4; i++)
+        {
+            ushort move = mv[i];
+            if (move == 0 || (i < results.Length && results[i].Valid))
+                continue;
+
+            string name = move < MoveNames.Count ? MoveNames[move] : $"#{move}";
+            if (TryGetLevelUpLevel(pk, move, out byte lvl) && lvl > pk.CurrentLevel)
+                sb.AppendLine($"• Mossa {i + 1} — {name}: serve almeno il livello {lvl}");
+            else
+                sb.AppendLine($"• Mossa {i + 1} — {name}: mossa non valida");
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+    // Minimum level-up level for a move on this species (Gen3 learn sources). Returns false
+    // if the move isn't a level-up move (or the format isn't handled here).
+    private static bool TryGetLevelUpLevel(PKM pk, ushort move, out byte level)
+    {
+        level = 0;
+        if (pk.Format != 3)
+            return false;
+        var ls = pk.Version switch
+        {
+            GameVersion.E => LearnSource3E.Instance.GetLearnset(pk.Species, pk.Form),
+            GameVersion.FR => LearnSource3FR.Instance.GetLearnset(pk.Species, pk.Form),
+            GameVersion.LG => LearnSource3LG.Instance.GetLearnset(pk.Species, pk.Form),
+            _ => LearnSource3RS.Instance.GetLearnset(pk.Species, pk.Form),
+        };
+        return ls.TryGetLevelLearnMove(move, out level);
+    }
+
+    private static bool Contains(ReadOnlySpan<ushort> span, ushort value)
+    {
+        foreach (var v in span)
+            if (v == value)
+                return true;
+        return false;
+    }
+
+    private static void ClampEvTotal(PKM pk)
+    {
+        int total = pk.EV_HP + pk.EV_ATK + pk.EV_DEF + pk.EV_SPA + pk.EV_SPD + pk.EV_SPE;
+        if (total <= 510)
+            return;
+        double f = 510.0 / total;
+        pk.EV_HP = (int)(pk.EV_HP * f); pk.EV_ATK = (int)(pk.EV_ATK * f); pk.EV_DEF = (int)(pk.EV_DEF * f);
+        pk.EV_SPA = (int)(pk.EV_SPA * f); pk.EV_SPD = (int)(pk.EV_SPD * f); pk.EV_SPE = (int)(pk.EV_SPE * f);
+    }
+
+    /// <summary>Writes all editor fields into <paramref name="pk"/> (used by Apply on the
+    /// real entity, and by the live legality check on a throwaway clone).</summary>
+    private void WriteTo(PKM pk)
+    {
+        // Species must be set before Level: CurrentLevel uses the species' growth rate.
+        pk.Species = (ushort)Species;
+
+        // Nature + gender + shiny: in Gen3–5 all three derive from the PID.
+        // Reroll the PID ONLY when one of them actually changed — otherwise keep the
+        // original PID, so we don't destroy the encounter's PID/IV correlation
+        // (which would wrongly report "Invalid PID" after editing e.g. a move). Gen6+
+        // store nature/gender independently, so set them directly.
+        var nature = (Nature)NatureIndex;
+        byte gender = CanEditGender ? (byte)GenderIndex : pk.Gender;
+        if (pk.Format is 3 or 4 or 5)
+        {
+            bool needReroll = pk.Nature != nature
+                           || (CanEditGender && pk.Gender != gender)
+                           || pk.IsShiny != IsShiny;
+            if (needReroll)
+            {
+                pk.PID = EntityPID.GetRandomPID(Util.Rand, pk.Species, gender, pk.Version, nature, pk.Form, pk.PID);
+                if (IsShiny)
+                    pk.SetShiny();
+                else
+                    while (pk.IsShiny)
+                        pk.PID = EntityPID.GetRandomPID(Util.Rand, pk.Species, gender, pk.Version, nature, pk.Form, pk.PID);
+            }
         }
         else
         {
-            while (_pk.IsShiny)
-                _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, gender, _pk.Version, nature, _pk.Form, _pk.PID);
+            pk.Nature = nature;
+            pk.Gender = gender;
+            pk.SetIsShiny(IsShiny);
         }
 
-        _pk.CurrentLevel = (byte)Math.Clamp(Level, 1, 100);
+        pk.CurrentLevel = (byte)Math.Clamp(Level, 1, 100);
         if (HasForms)
-            _pk.Form = (byte)Math.Clamp(FormIndex, 0, FormNames.Count - 1);
+            pk.Form = (byte)Math.Clamp(FormIndex, 0, FormNames.Count - 1);
 
-        _pk.HeldItem = Math.Max(0, HeldItemIndex);
+        pk.HeldItem = Math.Max(0, HeldItemIndex);
+
+        // Ability: apply after species is set (personal table depends on it).
+        if (AbilityOptions.Count > 0)
+            pk.RefreshAbility(Math.Clamp(AbilityIndex, 0, AbilityOptions.Count - 1));
 
         // Nickname: empty = not nicknamed (reset to the species' default name).
-        var defaultName = SpeciesName.GetSpeciesNameGeneration(_pk.Species, _pk.Language, (byte)_pk.Format);
+        var defaultName = SpeciesName.GetSpeciesNameGeneration(pk.Species, pk.Language, (byte)pk.Format);
         var nick = (NicknameText ?? "").Trim();
         if (nick.Length == 0)
         {
-            _pk.Nickname = defaultName;
-            _pk.IsNicknamed = false;
+            pk.Nickname = defaultName;
+            pk.IsNicknamed = false;
         }
         else
         {
-            _pk.Nickname = nick;
-            _pk.IsNicknamed = nick != defaultName;
+            pk.Nickname = nick;
+            pk.IsNicknamed = nick != defaultName;
         }
 
-        if (_pk is IAppliedMarkings<bool> marks)
+        if (pk is IAppliedMarkings<bool> marks)
         {
             foreach (var mk in Markings)
                 marks.SetMarking(mk.Index, mk.IsSet);
         }
 
-        SetMove(0); SetMove(1); SetMove(2); SetMove(3);
+        SetMove(pk, 0); SetMove(pk, 1); SetMove(pk, 2); SetMove(pk, 3);
 
-        _pk.IV_HP = Clamp(IvHp, 31); _pk.IV_ATK = Clamp(IvAtk, 31); _pk.IV_DEF = Clamp(IvDef, 31);
-        _pk.IV_SPA = Clamp(IvSpa, 31); _pk.IV_SPD = Clamp(IvSpd, 31); _pk.IV_SPE = Clamp(IvSpe, 31);
-        _pk.EV_HP = Clamp(EvHp, 255); _pk.EV_ATK = Clamp(EvAtk, 255); _pk.EV_DEF = Clamp(EvDef, 255);
-        _pk.EV_SPA = Clamp(EvSpa, 255); _pk.EV_SPD = Clamp(EvSpd, 255); _pk.EV_SPE = Clamp(EvSpe, 255);
+        pk.IV_HP = Clamp(IvHp, 31); pk.IV_ATK = Clamp(IvAtk, 31); pk.IV_DEF = Clamp(IvDef, 31);
+        pk.IV_SPA = Clamp(IvSpa, 31); pk.IV_SPD = Clamp(IvSpd, 31); pk.IV_SPE = Clamp(IvSpe, 31);
+        pk.EV_HP = Clamp(EvHp, 255); pk.EV_ATK = Clamp(EvAtk, 255); pk.EV_DEF = Clamp(EvDef, 255);
+        pk.EV_SPA = Clamp(EvSpa, 255); pk.EV_SPD = Clamp(EvSpd, 255); pk.EV_SPE = Clamp(EvSpe, 255);
 
-        _pk.MetLocation = (ushort)Math.Max(0, MetLocationIndex);
-        _pk.MetLevel = (byte)Math.Clamp(MetLevelValue, 0, 100);
+        pk.MetLocation = (ushort)Math.Max(0, MetLocationIndex);
+        pk.MetLevel = (byte)Math.Clamp(MetLevelValue, 0, 100);
 
-        if (_pk is IContestStats cs)
+        if (pk is IContestStats cs)
         {
             cs.ContestCool = (byte)Clamp(ConCool, 255); cs.ContestBeauty = (byte)Clamp(ConBeauty, 255);
             cs.ContestCute = (byte)Clamp(ConCute, 255); cs.ContestSmart = (byte)Clamp(ConSmart, 255);
@@ -337,33 +662,30 @@ public partial class PokemonEditorViewModel : ViewModelBase
         }
 
         foreach (var r in Ribbons)
-            r.ApplyTo(_pk);
+            r.ApplyTo(pk);
 
         // Party-only: recompute stored stats (so HP max reflects the new IVs/level),
         // then apply the requested current HP and status condition.
         if (_isParty)
         {
-            _pk.ResetPartyStats();
-            _pk.Status_Condition = IndexToStatus(StatusIndex);
-            _pk.Stat_HPCurrent = Math.Clamp(HpCurrent, 0, _pk.Stat_HPMax);
+            pk.ResetPartyStats();
+            pk.Status_Condition = IndexToStatus(StatusIndex);
+            pk.Stat_HPCurrent = Math.Clamp(HpCurrent, 0, pk.Stat_HPMax);
         }
-
-        Persist();
-        _onApplied();
     }
 
-    private void SetMove(int i)
+    private void SetMove(PKM pk, int i)
     {
         var vm = Moves[i];
         ushort move = (ushort)Math.Max(0, vm.MoveIndex);
         int ppUps = Math.Clamp(vm.PpUps, 0, 3);
-        int pp = Math.Clamp(vm.Pp, 0, _pk.GetMovePP(move, ppUps));
+        int pp = Math.Clamp(vm.Pp, 0, pk.GetMovePP(move, ppUps));
         switch (i)
         {
-            case 0: _pk.Move1 = move; _pk.Move1_PPUps = ppUps; _pk.Move1_PP = pp; break;
-            case 1: _pk.Move2 = move; _pk.Move2_PPUps = ppUps; _pk.Move2_PP = pp; break;
-            case 2: _pk.Move3 = move; _pk.Move3_PPUps = ppUps; _pk.Move3_PP = pp; break;
-            case 3: _pk.Move4 = move; _pk.Move4_PPUps = ppUps; _pk.Move4_PP = pp; break;
+            case 0: pk.Move1 = move; pk.Move1_PPUps = ppUps; pk.Move1_PP = pp; break;
+            case 1: pk.Move2 = move; pk.Move2_PPUps = ppUps; pk.Move2_PP = pp; break;
+            case 2: pk.Move3 = move; pk.Move3_PPUps = ppUps; pk.Move3_PP = pp; break;
+            case 3: pk.Move4 = move; pk.Move4_PPUps = ppUps; pk.Move4_PP = pp; break;
         }
     }
 
@@ -397,6 +719,21 @@ public partial class PokemonEditorViewModel : ViewModelBase
             _sav.SetPartySlotAtIndex(_pk, _slot);
         else
             _sav.SetBoxSlotAtIndex(_pk, _box, _slot);
+    }
+
+    // The species' selectable abilities as display names (duplicates kept: slot 1 / slot 2).
+    private static IReadOnlyList<string> BuildAbilityOptions(PKM pk, GameStrings str)
+    {
+        var pi = pk.PersonalInfo;
+        int count = pi.AbilityCount;
+        var names = str.Ability;
+        var list = new string[Math.Max(0, count)];
+        for (int i = 0; i < list.Length; i++)
+        {
+            int id = pi.GetAbilityAtIndex(i);
+            list[i] = (uint)id < names.Count ? names[id] : $"#{id}";
+        }
+        return list;
     }
 
     private static IReadOnlyList<string> MaterializeLocations(GameStrings str, PKM pk)

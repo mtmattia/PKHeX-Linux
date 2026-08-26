@@ -53,6 +53,77 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial PokemonEditorViewModel? Editor { get; set; }
 
+    // --- Undo (Annulla): keep up to 5 whole-save snapshots taken before each change. ---
+    private const int UndoMax = 5;
+    private readonly List<byte[]> _undoStack = new();
+    // Snapshot of the save at the moment the current editor was opened (pre-edit state).
+    private byte[]? _editBaseline;
+
+    [ObservableProperty]
+    public partial bool CanUndo { get; set; }
+
+    [ObservableProperty]
+    public partial string UndoLabel { get; set; } = "↶ Annulla";
+
+    private void CaptureBaseline() => _editBaseline = _sav?.Write().ToArray();
+
+    // Push the pre-change snapshot; drop the oldest beyond the 5-deep limit.
+    private void PushUndo(byte[]? snapshot)
+    {
+        if (snapshot is null)
+            return;
+        _undoStack.Add(snapshot);
+        if (_undoStack.Count > UndoMax)
+            _undoStack.RemoveAt(0);
+        UpdateUndoState();
+    }
+
+    // For direct save mutations (remove/create): snapshot the current state first.
+    private void PushCurrentAsUndo()
+    {
+        if (_sav is { } sav)
+            PushUndo(sav.Write().ToArray());
+    }
+
+    private void UpdateUndoState()
+    {
+        CanUndo = _undoStack.Count > 0;
+        UndoLabel = _undoStack.Count > 0 ? $"↶ Annulla ({_undoStack.Count})" : "↶ Annulla";
+        UndoCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo()
+    {
+        if (_undoStack.Count == 0)
+            return;
+        var bytes = _undoStack[^1];
+        _undoStack.RemoveAt(_undoStack.Count - 1);
+        RestoreSave(bytes);
+        UpdateUndoState();
+        StatusText = _undoStack.Count > 0
+            ? $"Modifica annullata — {_undoStack.Count} nella cronologia. Premi 💾 Salva per scrivere."
+            : "Modifica annullata. Premi 💾 Salva per scrivere.";
+    }
+
+    // Reload the whole save from a snapshot and rebind every sub-editor to it.
+    private void RestoreSave(byte[] bytes)
+    {
+        var restored = SaveUtil.GetSaveFile(bytes, _path);
+        if (restored is null)
+            return;
+        _sav = restored;
+        Trainer = new TrainerViewModel(_sav, OnSubEditorApplied);
+        Bag = new BagViewModel(_sav, OnSubEditorApplied);
+        Dex = new DexViewModel(_sav, OnSubEditorApplied);
+
+        int box = SelectedBoxIndex;
+        Editor = null;
+        SelectedSlot = null;
+        LoadBox(box);
+        CaptureBaseline();
+    }
+
     [ObservableProperty]
     public partial TrainerViewModel? Trainer { get; set; }
 
@@ -78,7 +149,8 @@ public partial class MainViewModel : ViewModelBase
             Editor = null;
             return;
         }
-        Editor = new PokemonEditorViewModel(sav, value.Entity, value.Box, value.Slot, value.IsParty, OnEditorApplied);
+        Editor = new PokemonEditorViewModel(sav, value.Entity, value.Box, value.Slot, value.IsParty, OnEditorApplied, msg => StatusText = msg);
+        CaptureBaseline(); // remember the pre-edit state so the next Apply/Fix is undoable
     }
 
     /// <summary>Removes the Pokémon in the selected slot (box: clear slot; party: delete + compact).</summary>
@@ -87,6 +159,7 @@ public partial class MainViewModel : ViewModelBase
         if (_sav is not { } sav || SelectedSlot is not { IsEmpty: false } slot)
             return;
 
+        PushCurrentAsUndo(); // make the removal undoable
         if (slot.IsParty)
             sav.DeletePartySlot(slot.Slot);
         else
@@ -108,6 +181,7 @@ public partial class MainViewModel : ViewModelBase
         if (_sav is not { } sav || SelectedSlot is not { IsEmpty: true } slot)
             return;
 
+        PushCurrentAsUndo(); // make the creation undoable
         var pk = sav.BlankPKM;
         pk.Species = 1; // sensible default; the user edits it right away
         pk.Version = ConcreteVersion(sav.Version);
@@ -147,6 +221,7 @@ public partial class MainViewModel : ViewModelBase
         if (_sav is not { } sav || SelectedSlot is not { IsEmpty: true } slot)
             return;
 
+        PushCurrentAsUndo(); // make the egg creation undoable
         PKM pk;
         try
         {
@@ -226,6 +301,7 @@ public partial class MainViewModel : ViewModelBase
 
     private void OnEditorApplied()
     {
+        PushUndo(_editBaseline); // the state before this edit becomes an undo point
         int slotIndex = SelectedSlot?.Slot ?? -1;
         LoadBox(SelectedBoxIndex);
         // Re-select the same slot so the editor rebinds to the freshly-decoded data.
@@ -248,6 +324,9 @@ public partial class MainViewModel : ViewModelBase
             _sav = sav;
             _path = path;
             HasSave = true;
+            _undoStack.Clear();
+            _editBaseline = null;
+            UpdateUndoState();
 
             SaveInfo = $"OT: {sav.OT}  ·  {DetectLanguageCode(sav)}";
             StatusText = $"Caricato: {Path.GetFileName(path)}";

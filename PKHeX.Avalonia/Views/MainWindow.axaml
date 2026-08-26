@@ -221,6 +221,8 @@
                 <Button Name="OpenButton" Classes="pill" Content="📂 Apri" Click="OnOpenClicked" />
                 <Button Classes="pill" Content="💾 Salva" Command="{Binding SaveCommand}" />
                 <Button Classes="pill" Content="💾 Salva con nome…" Click="OnSaveAsClicked" IsEnabled="{Binding HasSave}" />
+                <Button Classes="pill" Content="{Binding UndoLabel}" Command="{Binding UndoCommand}"
+                        IsVisible="{Binding CanUndo}" ToolTip.Tip="Annulla l'ultima modifica (fino a 5)" />
             </StackPanel>
             <TextBlock Grid.Column="2" Text="{Binding StatusText}" VerticalAlignment="Center"
                        Foreground="#3A2B5C" TextTrimming="CharacterEllipsis" />
@@ -276,20 +278,25 @@
                                 <Style Selector="ListBoxItem:pointerover Image.sprite">
                                     <Setter Property="RenderTransform" Value="translateY(-42px) scale(1.30)" />
                                 </Style>
-                                <!-- selezionato: ingrandito + saltellino continuo (via Margin, che ha un animator) -->
+                                <!-- selezionato: sprite ingrandito (transizione su RenderTransform: ok) -->
                                 <Style Selector="ListBoxItem:selected Image.sprite">
                                     <Setter Property="RenderTransform" Value="translateY(-42px) scale(1.16)" />
+                                </Style>
+                                <!-- saltellino continuo: animato su (TranslateTransform.Y) del wrapper.
+                                     NB: un'Animation a keyframe NON può usare RenderTransform (nessun animator)
+                                     e Margin è una proprietà di layout (freeze a schermo intero): la Y di una
+                                     TranslateTransform è un double con animator, non tocca il layout. -->
+                                <Style Selector="Panel.bobwrap">
+                                    <Setter Property="RenderTransform">
+                                        <TranslateTransform />
+                                    </Setter>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected Panel.bobwrap">
                                     <Style.Animations>
                                         <Animation Duration="0:0:0.7" IterationCount="INFINITE" Easing="SineEaseInOut">
-                                            <KeyFrame Cue="0%">
-                                                <Setter Property="Margin" Value="0,0,0,0" />
-                                            </KeyFrame>
-                                            <KeyFrame Cue="50%">
-                                                <Setter Property="Margin" Value="0,-7,0,0" />
-                                            </KeyFrame>
-                                            <KeyFrame Cue="100%">
-                                                <Setter Property="Margin" Value="0,0,0,0" />
-                                            </KeyFrame>
+                                            <KeyFrame Cue="0%"><Setter Property="(TranslateTransform.Y)" Value="0" /></KeyFrame>
+                                            <KeyFrame Cue="50%"><Setter Property="(TranslateTransform.Y)" Value="-7" /></KeyFrame>
+                                            <KeyFrame Cue="100%"><Setter Property="(TranslateTransform.Y)" Value="0" /></KeyFrame>
                                         </Animation>
                                     </Style.Animations>
                                 </Style>
@@ -307,9 +314,13 @@
                                         <!-- ombra fittizia / base slot: cerchietto scuro sfumato (visibile anche se vuoto) -->
                                         <Ellipse Width="90" Height="90" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                  Margin="0,14,0,0" Fill="{StaticResource SlotShadow}" />
-                                        <Image Source="{Binding Sprite}" Width="196" Height="168"
-                                               Classes="sprite" Stretch="Uniform"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Panel Classes="bobwrap" Width="196" Height="168"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Background="Transparent" ClipToBounds="False">
+                                            <Image Source="{Binding Sprite}" Width="196" Height="168"
+                                                   Classes="sprite" Stretch="Uniform"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Panel>
                                         <TextBlock Text="★" Foreground="#F4B400" FontSize="15"
                                                    HorizontalAlignment="Right" VerticalAlignment="Top"
                                                    Margin="0,4,6,0" IsVisible="{Binding IsShiny}" />
@@ -350,17 +361,30 @@
             </Border>
 
             <!-- Editor panel (in basso) -->
-            <Border Grid.Row="1" MaxHeight="360" Padding="12"
+            <Border Grid.Row="1" MaxHeight="420" Padding="12"
                     Background="#22808080"
                     IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <ScrollViewer>
+              <Grid RowDefinitions="*,Auto">
+                <ScrollViewer Grid.Row="0">
                     <StackPanel DataContext="{Binding Editor}" Spacing="6"
                                 x:DataType="vm:PokemonEditorViewModel">
                         <Border CornerRadius="4" Padding="8,5" Background="#18808080">
                             <StackPanel Spacing="4">
-                                <Grid ColumnDefinitions="*,Auto">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                                     <TextBlock Grid.Column="0" Text="{Binding LegalityText}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Markings}" IsVisible="{Binding HasMarkings}" VerticalAlignment="Center">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <Button Content="🔧 Fix legalità" Command="{Binding FixLegalityCommand}"
+                                                IsVisible="{Binding CanFixLegality}" Padding="8,3"
+                                                FontSize="12" FontWeight="SemiBold"
+                                                Background="#33E0A000" Foreground="#7A5200"
+                                                ToolTip.Tip="Corregge mosse/PP, zona e livello di cattura ed EV per rendere il Pokémon legale — NON tocca la natura/PID (annullabile)" />
+                                        <Button Content="🎲 Fix PID" Command="{Binding FixPidCommand}"
+                                                IsVisible="{Binding CanFixPid}" Padding="8,3"
+                                                FontSize="12" FontWeight="SemiBold"
+                                                Background="#333CA0E0" Foreground="#0A4A73"
+                                                ToolTip.Tip="Rende legale il PID per la natura scelta: uovo → IV liberi; selvatico/statico → cerca un frame RNG valido (IV dettati dal frame)" />
+                                    </StackPanel>
+                                    <ItemsControl Grid.Column="3" ItemsSource="{Binding Markings}" IsVisible="{Binding HasMarkings}" VerticalAlignment="Center">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
                                         </ItemsControl.ItemsPanel>
@@ -371,6 +395,8 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </Grid>
+                                <TextBlock Text="{Binding MoveHints}" IsVisible="{Binding HasMoveHints}"
+                                           TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Foreground="#B23B00" />
                                 <Expander IsVisible="{Binding HasLegalityReport}" Padding="0">
                                     <Expander.Header><TextBlock Text="Dettagli legalità" FontSize="12" /></Expander.Header>
                                     <TextBlock Text="{Binding LegalityReport}" TextWrapping="Wrap" FontSize="12" Opacity="0.85" />
@@ -394,6 +420,10 @@
                                 <!-- Natura di fianco al livello, in grassetto -->
                                 <ComboBox Classes="borderless" ItemsSource="{Binding NatureNames}" SelectedIndex="{Binding NatureIndex}"
                                           FontWeight="Bold" VerticalAlignment="Center" Margin="6,0,0,0" ToolTip.Tip="Natura" />
+                                <!-- Abilità subito dopo la natura -->
+                                <ComboBox Classes="borderless" ItemsSource="{Binding AbilityOptions}" SelectedIndex="{Binding AbilityIndex}"
+                                          VerticalAlignment="Center" Margin="6,0,0,0" ToolTip.Tip="Abilità"
+                                          IsVisible="{Binding HasAbilityChoice}" />
                                 <ComboBox Classes="borderless" ItemsSource="{Binding ItemNames}" SelectedIndex="{Binding HeldItemIndex}"
                                           VerticalAlignment="Center" ToolTip.Tip="Strumento tenuto" />
                             </StackPanel>
@@ -430,7 +460,11 @@
                         </Border>
 
                         <!-- Statistiche (IV/EV) — subito dopo le mosse -->
-                        <TextBlock Text="Statistiche (IV / EV)" Margin="0,6,0,0" Opacity="0.7" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                            <TextBlock Text="Statistiche (IV / EV)" Opacity="0.7" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding EvSummary}" FontWeight="SemiBold" Opacity="0.85"
+                                       VerticalAlignment="Center" ToolTip.Tip="Totale EV assegnati / massimo 510" />
+                        </Grid>
                         <Border Classes="card">
                         <UniformGrid Columns="3">
                             <Grid ColumnDefinitions="34,28,34" ColumnSpacing="3" Margin="0,2,14,2">
@@ -571,9 +605,6 @@
                             </Grid>
                         </Border>
 
-                        <Button Content="✔ Applica" Command="{Binding ApplyCommand}"
-                                HorizontalAlignment="Stretch" Margin="0,10,0,0" />
-
                         <Border Height="1" Background="#40808080" Margin="0,10" />
 
                         <TextBlock Text="Set Showdown" FontWeight="SemiBold" />
@@ -590,12 +621,22 @@
                                     HorizontalAlignment="Stretch" />
                         </Grid>
 
-                        <Border Height="1" Background="#40808080" Margin="0,12,0,0" />
-                        <Button Content="🗑 Rimuovi Pokémon" Click="OnRemoveClicked"
-                                HorizontalAlignment="Stretch" Margin="0,4,0,0"
-                                Background="#33E04848" Foreground="#FFD0D0" />
                     </StackPanel>
                 </ScrollViewer>
+
+                <!-- Barra azioni fissa: sempre visibile mentre l'editor è attivo -->
+                <Border Grid.Row="1" Margin="0,8,0,0" Padding="0" Background="Transparent">
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <Button Grid.Column="0" Content="✔ Applica" Command="{Binding Editor.ApplyCommand}"
+                                HorizontalAlignment="Stretch" FontWeight="SemiBold" />
+                        <Button Grid.Column="1" Content="{Binding UndoLabel}" Command="{Binding UndoCommand}"
+                                ToolTip.Tip="Annulla l'ultima modifica (fino a 5 in cronologia)" />
+                        <Button Grid.Column="2" Content="🗑 Rimuovi" Click="OnRemoveClicked"
+                                Background="#33E04848" Foreground="#FFD0D0"
+                                ToolTip.Tip="Rimuovi il Pokémon da questo slot" />
+                    </Grid>
+                </Border>
+              </Grid>
             </Border>
         </Grid>
         </TabItem>
