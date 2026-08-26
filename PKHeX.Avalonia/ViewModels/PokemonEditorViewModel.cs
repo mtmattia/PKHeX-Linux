@@ -393,8 +393,8 @@ public partial class PokemonEditorViewModel : ViewModelBase
         TryLegalize(_pk); // moves/met/EV so only the PID/IV correlation remains
         var nature = (Nature)NatureIndex;
 
-        // Free case: bred/egg → any PID legal, keep the chosen IVs.
-        if (_pk.WasEgg || _pk.IsEgg)
+        // Free case: encounter with no PID/IV correlation (Gen3 eggs) → any PID legal, keep IVs.
+        if (IsPidIvFree(_pk))
         {
             _pk.PID = EntityPID.GetRandomPID(Util.Rand, _pk.Species, (byte)_pk.Gender, _pk.Version, nature, _pk.Form, _pk.PID);
             if (IsShiny) _pk.SetShiny();
@@ -478,28 +478,35 @@ public partial class PokemonEditorViewModel : ViewModelBase
         }
         catch { /* leave met as-is if no suggestion */ }
 
-        // 3. Moves: replace ONLY the illegal slots with legal suggestions, keeping the
-        //    moves that are already valid. Then restore full PP.
+        // 3. Moves: replace ONLY the illegal slots with legal suggestions, keeping valid ones.
+        RepairMoves(pk);
+
+        // 4. Recompute stored stats for party members.
+        pk.RefreshChecksum();
+    }
+
+    /// <summary>Keeps the moves that are already legal and replaces the illegal ones with
+    /// legal suggestions of the given source type; then restores full PP.</summary>
+    private static void RepairMoves(PKM pk, MoveSourceType types = MoveSourceType.All)
+    {
         try
         {
             var la = new LegalityAnalysis(pk);
             var results = la.Info.Moves; // per-slot validity (index 0..3)
             Span<ushort> suggested = stackalloc ushort[4];
-            la.GetSuggestedCurrentMoves(suggested);
+            la.GetSuggestedCurrentMoves(suggested, types);
 
             Span<ushort> cur = [pk.Move1, pk.Move2, pk.Move3, pk.Move4];
             Span<ushort> final = stackalloc ushort[4];
 
-            // Which current moves we keep (valid and non-empty).
             for (int i = 0; i < 4; i++)
                 final[i] = (i < results.Length && results[i].Valid) ? cur[i] : (ushort)0;
 
-            // Fill the emptied (illegal) slots with suggested moves not already present.
             int pick = 0;
             for (int i = 0; i < 4; i++)
             {
                 if (i < results.Length && results[i].Valid)
-                    continue; // kept
+                    continue;
                 while (pick < 4)
                 {
                     ushort cand = suggested[pick++];
@@ -516,9 +523,147 @@ public partial class PokemonEditorViewModel : ViewModelBase
             pk.HealPP();
         }
         catch { /* keep existing moves if suggestion fails */ }
+    }
 
-        // 4. Recompute stored stats for party members.
-        pk.RefreshChecksum();
+    /// <summary>True when the matched encounter imposes no PID/IV correlation (e.g. Gen3 eggs),
+    /// so any PID and any IVs are legal.</summary>
+    private static bool IsPidIvFree(PKM pk)
+    {
+        try { return new LegalityAnalysis(pk).Info.PIDIV.Type == PIDType.None; }
+        catch { return pk.IsEgg || pk.WasEgg; }
+    }
+
+    // ---------------- Origine: Uovo / Schiuso / Selvatico (erba alta) ----------------
+
+    /// <summary>Origin buttons apply to Gen3 entities.</summary>
+    public bool CanSetOrigin => _pk.Format is 3;
+
+    /// <summary>Turn the entity into an unhatched Egg (becomes the base/breedable species).</summary>
+    [RelayCommand]
+    private void MakeEgg()
+    {
+        WriteTo(_pk);
+        var (ok, msg) = ApplyEggOrigin(_pk, unhatched: true);
+        if (ok) { _pk.RefreshChecksum(); Persist(); _onApplied(); }
+        _onStatus?.Invoke(msg);
+    }
+
+    /// <summary>Mark the entity as a bred/hatched Pokémon (keeps species, level, nature, IVs).</summary>
+    [RelayCommand]
+    private void MakeHatched()
+    {
+        WriteTo(_pk);
+        var (ok, msg) = ApplyEggOrigin(_pk, unhatched: false);
+        if (ok) { _pk.RefreshChecksum(); Persist(); _onApplied(); }
+        _onStatus?.Invoke(msg);
+    }
+
+    /// <summary>Make the entity a wild "tall grass" catch: wild met + level-up moves + a legal
+    /// Method-1 PID for the chosen nature (frame search).</summary>
+    [RelayCommand]
+    private async Task MakeWild()
+    {
+        WriteTo(_pk);
+        _pk.IsEgg = false;
+        _pk.EggLocation = 0;
+
+        EncounterSuggestionData? info;
+        try { info = EncounterSuggestion.GetSuggestedMetInfo(_pk); }
+        catch { info = null; }
+        if (info is null || info.Location == 0)
+        {
+            _onStatus?.Invoke("Nessun incontro selvatico noto per questa specie in questo gioco.");
+            return;
+        }
+
+        _pk.MetLocation = info.Location;
+        _pk.MetLevel = info.LevelMin;
+        if (_pk.CurrentLevel < info.LevelMin)
+            _pk.CurrentLevel = info.LevelMin;
+        _pk.Nickname = SpeciesName.GetSpeciesNameGeneration(_pk.Species, _pk.Language, (byte)_pk.Format);
+        _pk.IsNicknamed = false;
+        RepairMoves(_pk, MoveSourceType.LevelUp); // wild mons only have level-up moves
+
+        var nature = (Nature)NatureIndex;
+        bool wantShiny = IsShiny;
+        var probe = _pk.Clone();
+        var found = await Task.Run(() => FrameSearchMethod1(probe, nature, wantShiny));
+        if (found is { } r)
+        {
+            _pk.PID = r.Pid;
+            _pk.IV_HP = r.HP; _pk.IV_ATK = r.ATK; _pk.IV_DEF = r.DEF;
+            _pk.IV_SPA = r.SPA; _pk.IV_SPD = r.SPD; _pk.IV_SPE = r.SPE;
+        }
+        _pk.RefreshChecksum();
+        Persist();
+        _onApplied();
+        _onStatus?.Invoke(found is not null
+            ? $"Impostato come SELVATICO (erba alta) · zona/livello e PID legali per natura {NatureNames[(int)nature]}."
+            : "Impostato come selvatico, ma non ho trovato un PID legale per la natura scelta (prova un'altra natura o l'uovo).");
+    }
+
+    // Egg hatch location for the entity's game.
+    private static byte HatchLocation(GameVersion ver) =>
+        ver is GameVersion.FR or GameVersion.LG ? Locations.HatchLocationFRLG : Locations.HatchLocationRSE;
+
+    private (bool ok, string message) ApplyEggOrigin(PKM pk, bool unhatched)
+    {
+        var baseSpecies = EvolutionTree.Evolves3.GetBaseSpeciesForm(pk.Species, pk.Form).Species;
+        if (!Breeding.CanHatchAsEgg(baseSpecies))
+            return (false, "Questa specie non è ottenibile da uovo (non allevabile).");
+
+        byte hatch = HatchLocation(pk.Version);
+        var nature = (Nature)NatureIndex;
+
+        // Bred entities always come in a Poké Ball; regenerate the PID so it satisfies the egg
+        // correlation (a leftover wild PID would be flagged), honoring the shiny choice.
+        ushort pidSpecies = unhatched ? baseSpecies : pk.Species;
+        pk.Ball = 4; // Poké Ball
+        pk.PID = EntityPID.GetRandomPID(Util.Rand, pidSpecies, (byte)pk.Gender, pk.Version, nature, pk.Form, pk.PID);
+        if (IsShiny) pk.SetShiny();
+        else while (pk.IsShiny) pk.PID = EntityPID.GetRandomPID(Util.Rand, pidSpecies, (byte)pk.Gender, pk.Version, nature, pk.Form, pk.PID);
+
+        if (unhatched)
+        {
+            if (baseSpecies != pk.Species)
+                pk.Species = baseSpecies; // an egg is always the base species
+            pk.IsEgg = true;
+            pk.CurrentLevel = EggStateLegality.EggLevel23;   // 5
+            pk.MetLevel = EggStateLegality.EggMetLevel34;     // 0
+            pk.MetLocation = hatch;
+            pk.EggLocation = 0;
+            pk.Nickname = SpeciesName.GetEggName(pk.Language, pk.Format);
+            pk.IsNicknamed = true;
+            pk.OriginalTrainerFriendship = (byte)EggStateLegality.GetMaximumEggHatchCycles(pk);
+            ClearEggForbiddenExtras(pk); // an egg has no EVs, contest stats or ribbons
+            RepairMoves(pk, MoveSourceType.LevelUp); // base egg moveset for level 5
+            return (true, $"Trasformato in UOVO di {SpeciesNames[pk.Species]}.");
+        }
+
+        // Hatched/bred: keep species/level/nature/IVs/EVs; set the egg-origin met markers.
+        pk.IsEgg = false;
+        pk.MetLocation = hatch;
+        pk.MetLevel = 0;               // Gen3 hatched eggs have met level 0
+        pk.EggLocation = 0;
+        if (pk.CurrentLevel < EggStateLegality.EggLevel23)
+            pk.CurrentLevel = EggStateLegality.EggLevel23;
+        pk.Nickname = SpeciesName.GetSpeciesNameGeneration(pk.Species, pk.Language, (byte)pk.Format);
+        pk.IsNicknamed = false;
+        RepairMoves(pk); // keep legal moves (egg + level-up allowed for a bred mon)
+        return (true, "Impostato come SCHIUSO (allevato da uovo) — natura e IV liberi.");
+    }
+
+    // An unhatched egg can't carry EVs, contest stats or ribbons.
+    private static void ClearEggForbiddenExtras(PKM pk)
+    {
+        pk.EV_HP = pk.EV_ATK = pk.EV_DEF = pk.EV_SPA = pk.EV_SPD = pk.EV_SPE = 0;
+        if (pk is IContestStats cs)
+        {
+            cs.ContestCool = cs.ContestBeauty = cs.ContestCute = 0;
+            cs.ContestSmart = cs.ContestTough = cs.ContestSheen = 0;
+        }
+        foreach (var ri in RibbonInfo.GetRibbonInfo(pk))
+            ReflectUtil.SetValue(pk, ri.Name, ri.Type == RibbonValueType.Boolean ? false : (object)(byte)0);
     }
 
     // Names each illegal move; for a level-up move learned above the current level,
@@ -778,9 +923,22 @@ public partial class MoveSlotViewModel : ViewModelBase
     private readonly Func<ushort, int, int> _maxPp;
 
     public IReadOnlyList<string> MoveNames { get; }
+    private readonly Dictionary<string, int> _nameToId;
     [ObservableProperty] public partial int MoveIndex { get; set; }
     [ObservableProperty] public partial int Pp { get; set; }
     [ObservableProperty] public partial int PpUps { get; set; }
+
+    /// <summary>Move as its display name — lets the UI use a searchable, type-to-filter box
+    /// (the move list has 900+ entries). Setting an unknown/partial name leaves the id as-is.</summary>
+    public string? SelectedMoveName
+    {
+        get => (uint)MoveIndex < MoveNames.Count ? MoveNames[MoveIndex] : null;
+        set
+        {
+            if (value is not null && _nameToId.TryGetValue(value, out var id) && id != MoveIndex)
+                MoveIndex = id;
+        }
+    }
 
     /// <summary>Current max PP with the current PP Ups ("reali").</summary>
     public int MaxPp => _maxPp((ushort)Math.Max(0, MoveIndex), Math.Clamp(PpUps, 0, 3));
@@ -791,6 +949,10 @@ public partial class MoveSlotViewModel : ViewModelBase
     {
         MoveNames = moveNames;
         _maxPp = maxPp;
+        // Name → id map for the searchable selector (first occurrence wins; names are unique).
+        _nameToId = new Dictionary<string, int>(moveNames.Count, StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < moveNames.Count; i++)
+            _nameToId.TryAdd(moveNames[i], i);
         MoveIndex = move;
         Pp = pp;
         PpUps = ppUps;
@@ -800,6 +962,7 @@ public partial class MoveSlotViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(MaxPp));
         OnPropertyChanged(nameof(MaxPpFull));
+        OnPropertyChanged(nameof(SelectedMoveName));
         if (Pp > MaxPp) Pp = MaxPp;
     }
 

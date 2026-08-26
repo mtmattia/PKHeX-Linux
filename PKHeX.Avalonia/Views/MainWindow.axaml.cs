@@ -64,6 +64,73 @@ public partial class MainWindow : Window
             vm.SaveAs(path);
     }
 
+    private async void OnExportPokemonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.HasSelectedPokemon)
+            return;
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Esporta Pokémon (.pk3)",
+            SuggestedFileName = vm.SuggestedPkmFileName,
+            DefaultExtension = "pk3",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Pokémon Gen3") { Patterns = new[] { "*.pk3" } },
+                FilePickerFileTypes.All,
+            },
+        });
+        var path = file?.TryGetLocalPath();
+        if (path is not null)
+            vm.ExportSelectedPokemon(path);
+    }
+
+    private async void OnImportPokemonClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || vm.SelectedSlot is null)
+            return;
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Importa Pokémon (.pk3)",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Pokémon Gen3") { Patterns = new[] { "*.pk3", "*.pk*" } },
+                FilePickerFileTypes.All,
+            },
+        });
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (path is not null)
+            vm.ImportSelectedPokemon(path);
+    }
+
+    private async void OnExportBoxClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.IsBoxSelected)
+            return;
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Scegli la cartella dove esportare il Box (.pk3)",
+            AllowMultiple = false,
+        });
+        var dir = folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        if (dir is not null)
+            vm.ExportBoxToFolder(dir);
+    }
+
+    private async void OnImportBoxClicked(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || !vm.IsBoxSelected)
+            return;
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Scegli la cartella con i .pk3 da importare nel Box",
+            AllowMultiple = false,
+        });
+        var dir = folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        if (dir is not null)
+            vm.ImportBoxFromFolder(dir);
+    }
+
     private async void OnRemoveClicked(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm)

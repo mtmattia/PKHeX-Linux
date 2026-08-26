@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PKHeX.Core;
@@ -31,7 +32,11 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial int SelectedBoxIndex { get; set; }
 
-    partial void OnSelectedBoxIndexChanged(int value) => LoadBox(value);
+    partial void OnSelectedBoxIndexChanged(int value)
+    {
+        LoadBox(value);
+        OnPropertyChanged(nameof(IsBoxSelected));
+    }
 
     [RelayCommand]
     private void NextBox()
@@ -142,6 +147,8 @@ public partial class MainViewModel : ViewModelBase
     partial void OnSelectedSlotChanged(SlotViewModel? value)
     {
         IsEmptySlotSelected = value is { IsEmpty: true };
+        OnPropertyChanged(nameof(HasSelectedPokemon));
+        OnPropertyChanged(nameof(SuggestedPkmFileName));
         CreatePokemonCommand.NotifyCanExecuteChanged();
         CreateEggCommand.NotifyCanExecuteChanged();
         if (_sav is not { } sav || value is null || value.IsEmpty)
@@ -209,6 +216,150 @@ public partial class MainViewModel : ViewModelBase
         if (slotIndex >= 0 && slotIndex < CurrentBox.Count)
             SelectedSlot = CurrentBox[slotIndex]; // reselect → opens the editor on the new Pokémon
         StatusText = "Nuovo Pokémon creato — modificalo e premi 💾 Salva.";
+    }
+
+    // ---- Import/Export su file: backup binario completo (.pk3), non lossy come Showdown. ----
+
+    public bool HasSelectedPokemon => SelectedSlot is { IsEmpty: false };
+    /// <summary>True when a real Box (not the party) is selected — box export/import target.</summary>
+    public bool IsBoxSelected => SelectedBoxIndex >= 1;
+    /// <summary>Suggested file name (no extension) for exporting the selected Pokémon.</summary>
+    public string SuggestedPkmFileName =>
+        SelectedSlot is { IsEmpty: false } s ? s.Entity.FileNameWithoutExtension : "pokemon";
+
+    /// <summary>Writes the selected Pokémon to a .pk3 file (decrypted stored data = full backup).</summary>
+    public void ExportSelectedPokemon(string path)
+    {
+        if (SelectedSlot is not { IsEmpty: false } slot)
+            return;
+        try
+        {
+            File.WriteAllBytes(path, GetStoredBytes(slot.Entity));
+            StatusText = $"Pokémon esportato: {Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Esportazione fallita: {ex.Message}";
+        }
+    }
+
+    /// <summary>Loads a .pk3 file into the selected slot (undoable).</summary>
+    public void ImportSelectedPokemon(string path)
+    {
+        if (_sav is not { } sav || SelectedSlot is not { } slot)
+            return;
+        try
+        {
+            var pk = EntityFormat.GetFromBytes(File.ReadAllBytes(path), sav.Context);
+            if (pk is null || pk.Context != sav.Context)
+            {
+                StatusText = "File non compatibile con questo salvataggio (serve un .pk3 dello stesso gioco).";
+                return;
+            }
+            PushCurrentAsUndo();
+            pk.RefreshChecksum();
+            if (slot.IsParty)
+                sav.SetPartySlotAtIndex(pk, slot.Slot);
+            else
+                sav.SetBoxSlotAtIndex(pk, slot.Box, slot.Slot);
+
+            int slotIndex = slot.Slot;
+            LoadBox(SelectedBoxIndex);
+            if (slotIndex >= 0 && slotIndex < CurrentBox.Count)
+                SelectedSlot = CurrentBox[slotIndex];
+            StatusText = $"Pokémon importato da {Path.GetFileName(path)} — premi 💾 Salva.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Importazione fallita: {ex.Message}";
+        }
+    }
+
+    /// <summary>Dumps every non-empty slot of the current box to a folder as .pk3 files.</summary>
+    public void ExportBoxToFolder(string dir)
+    {
+        if (_sav is not { } sav)
+            return;
+        int box = SelectedBoxIndex - 1;
+        if (box < 0)
+        {
+            StatusText = "Seleziona un Box (non la Squadra) da esportare.";
+            return;
+        }
+        try
+        {
+            var data = sav.GetBoxData(box);
+            int n = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                var pk = data[i];
+                if (pk.Species == 0)
+                    continue;
+                var name = $"{i + 1:00} - {Sanitize(pk.FileNameWithoutExtension)}.pk3";
+                File.WriteAllBytes(Path.Combine(dir, name), GetStoredBytes(pk));
+                n++;
+            }
+            StatusText = $"Box {box + 1} esportato: {n} Pokémon in {dir}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Esportazione box fallita: {ex.Message}";
+        }
+    }
+
+    /// <summary>Loads .pk3 files from a folder into the current box, filling from slot 1 (undoable).</summary>
+    public void ImportBoxFromFolder(string dir)
+    {
+        if (_sav is not { } sav)
+            return;
+        int box = SelectedBoxIndex - 1;
+        if (box < 0)
+        {
+            StatusText = "Seleziona un Box (non la Squadra) dove importare.";
+            return;
+        }
+        try
+        {
+            var files = Directory.GetFiles(dir, "*.pk3").OrderBy(f => f, StringComparer.Ordinal).ToArray();
+            if (files.Length == 0)
+            {
+                StatusText = "Nessun file .pk3 trovato nella cartella.";
+                return;
+            }
+            PushCurrentAsUndo();
+            int slot = 0;
+            foreach (var f in files)
+            {
+                if (slot >= sav.BoxSlotCount)
+                    break;
+                var pk = EntityFormat.GetFromBytes(File.ReadAllBytes(f), sav.Context);
+                if (pk is null || pk.Context != sav.Context)
+                    continue;
+                pk.RefreshChecksum();
+                sav.SetBoxSlotAtIndex(pk, box, slot);
+                slot++;
+            }
+            LoadBox(SelectedBoxIndex);
+            StatusText = $"Box importato: {slot} Pokémon da {dir} — premi 💾 Salva.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Importazione box fallita: {ex.Message}";
+        }
+    }
+
+    private static byte[] GetStoredBytes(PKM pk)
+    {
+        var buf = new byte[pk.SIZE_STORED];
+        pk.WriteDecryptedDataStored(buf);
+        return buf;
+    }
+
+    private static string Sanitize(string name)
+    {
+        foreach (var c in Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        return name;
     }
 
     public bool SupportsEggs { get; private set; }

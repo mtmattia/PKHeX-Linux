@@ -16,6 +16,10 @@ sealed class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            // Render dropdown/combo popups inside the main window. On Linux (X11/XWayland under
+            // KWin/Wayland) native popups can open misaligned from the control; overlay popups
+            // are positioned relative to the control and stay aligned.
+            .With(new X11PlatformOptions { OverlayPopups = true })
 #if DEBUG
             .WithDeveloperTools()
 #endif
