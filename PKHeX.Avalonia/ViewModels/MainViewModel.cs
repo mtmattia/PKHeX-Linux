@@ -234,7 +234,7 @@ public partial class MainViewModel : ViewModelBase
             return;
         try
         {
-            File.WriteAllBytes(path, GetStoredBytes(slot.Entity));
+            File.WriteAllBytes(path, GetEntityBytes(slot.Entity));
             StatusText = $"Pokémon esportato: {Path.GetFileName(path)}";
         }
         catch (Exception ex)
@@ -296,7 +296,7 @@ public partial class MainViewModel : ViewModelBase
                 if (pk.Species == 0)
                     continue;
                 var name = $"{i + 1:00} - {Sanitize(pk.FileNameWithoutExtension)}.pk3";
-                File.WriteAllBytes(Path.Combine(dir, name), GetStoredBytes(pk));
+                File.WriteAllBytes(Path.Combine(dir, name), GetEntityBytes(pk));
                 n++;
             }
             StatusText = $"Box {box + 1} esportato: {n} Pokémon in {dir}";
@@ -348,10 +348,12 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    private static byte[] GetStoredBytes(PKM pk)
+    // Full-party decrypted bytes (100B for Gen3): identical to what PKHeX itself writes for a
+    // .pk3, so the files are byte-for-byte interchangeable and include the party stats.
+    private static byte[] GetEntityBytes(PKM pk)
     {
-        var buf = new byte[pk.SIZE_STORED];
-        pk.WriteDecryptedDataStored(buf);
+        var buf = new byte[pk.SIZE_PARTY];
+        pk.WriteDecryptedDataParty(buf);
         return buf;
     }
 
